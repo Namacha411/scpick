@@ -1,0 +1,15 @@
+# Sample ssh_config for sshconf package tests.
+Host *
+    ServerAliveInterval 60
+
+Host prod-db
+    HostName 10.0.1.5
+    User deploy
+    Port 2222
+
+Host staging
+    HostName staging.example.com
+    User ubuntu
+
+Host no-hostname
+    User root

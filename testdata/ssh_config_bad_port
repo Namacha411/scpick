@@ -1,0 +1,3 @@
+Host bad-port
+    HostName 10.0.1.9
+    Port not-a-number
