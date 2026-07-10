@@ -11,6 +11,14 @@ import (
 type listFunc func(dir string) ([]picker.Entry, error)
 type parentFunc func(dir string) string
 
+// FileSelection is the outcome of browsing for source files: plain file
+// picks, plus (in recursive mode) whole-directory picks made via the
+// "★ transfer this directory" marker.
+type FileSelection struct {
+	Files       []string
+	Directories []string
+}
+
 func localListFunc(dir string) ([]picker.Entry, error) {
 	entries, err := localfs.ListDir(dir)
 	if err != nil {
@@ -47,25 +55,19 @@ func remoteParent(dir string) string {
 }
 
 // BrowseRemoteFiles lets the user navigate the remote filesystem starting
-// at startDir and select one or more files to pull. Not covered by
-// automated tests (drives the picker TUI); verify manually per SPEC.md.
-func BrowseRemoteFiles(client remoteFile, startDir string) ([]string, error) {
-	items, err := browseFiles(startDir, remoteListFunc(client), remoteParent)
-	if err != nil {
-		return nil, err
-	}
-	return itemPaths(items), nil
+// at startDir and select one or more files (and, if recursive, whole
+// directories) to pull. Not covered by automated tests (drives the picker
+// TUI); verify manually per SPEC.md.
+func BrowseRemoteFiles(client remoteFile, startDir string, recursive bool) (FileSelection, error) {
+	return browseFiles(startDir, remoteListFunc(client), remoteParent, recursive)
 }
 
 // BrowseLocalFiles lets the user navigate the local filesystem starting at
-// startDir and select one or more files to push. Not covered by automated
-// tests (drives the picker TUI); verify manually per SPEC.md.
-func BrowseLocalFiles(startDir string) ([]string, error) {
-	items, err := browseFiles(startDir, localListFunc, localfs.GetParentDir)
-	if err != nil {
-		return nil, err
-	}
-	return itemPaths(items), nil
+// startDir and select one or more files (and, if recursive, whole
+// directories) to push. Not covered by automated tests (drives the picker
+// TUI); verify manually per SPEC.md.
+func BrowseLocalFiles(startDir string, recursive bool) (FileSelection, error) {
+	return browseFiles(startDir, localListFunc, localfs.GetParentDir, recursive)
 }
 
 // BrowseLocalDir lets the user navigate the local filesystem starting at
@@ -91,26 +93,31 @@ func itemPaths(items []picker.ListItem) []string {
 }
 
 // browseFiles repeatedly lists dir, presents it in file-pick mode, and
-// either navigates into a selected directory or returns the selected
-// files. If both files and a directory are tagged together, the files win
-// and the directory tag is ignored; if only directories are tagged, it
-// navigates into the first one.
-func browseFiles(startDir string, list listFunc, parent parentFunc) ([]picker.ListItem, error) {
+// either navigates into a selected directory or returns the selection. A
+// "★ transfer this directory" marker (only offered when recursive is true)
+// picks the current directory as a whole; plain files are returned as
+// FileSelection.Files. If neither a marker nor a file was picked but a
+// plain directory was, it navigates into the first one.
+func browseFiles(startDir string, list listFunc, parent parentFunc, recursive bool) (FileSelection, error) {
 	dir := startDir
 	for {
 		entries, err := list(dir)
 		if err != nil {
-			return nil, err
+			return FileSelection{}, err
 		}
-		items := picker.BuildFileList(entries, parent(dir))
+		items := picker.BuildFileList(entries, parent(dir), dir, recursive)
 		selected, err := picker.PickFiles(items)
 		if err != nil {
-			return nil, err
+			return FileSelection{}, err
 		}
 
-		var files []picker.ListItem
+		var files, dirs []picker.ListItem
 		var firstDir *picker.ListItem
 		for i := range selected {
+			if selected[i].IsMarker {
+				dirs = append(dirs, selected[i])
+				continue
+			}
 			if selected[i].IsDir {
 				if firstDir == nil {
 					firstDir = &selected[i]
@@ -119,14 +126,14 @@ func browseFiles(startDir string, list listFunc, parent parentFunc) ([]picker.Li
 			}
 			files = append(files, selected[i])
 		}
-		if len(files) > 0 {
-			return files, nil
+		if len(files) > 0 || len(dirs) > 0 {
+			return FileSelection{Files: itemPaths(files), Directories: itemPaths(dirs)}, nil
 		}
 		if firstDir != nil {
 			dir = firstDir.Path
 			continue
 		}
-		return nil, fmt.Errorf("transfer: no file selected")
+		return FileSelection{}, fmt.Errorf("transfer: no file selected")
 	}
 }
 

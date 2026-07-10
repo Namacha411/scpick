@@ -18,15 +18,16 @@ const manualEntryPath = "\x00manual-entry"
 // RunPull drives the full interactive pull flow: host selection,
 // authentication, remote file browsing, local destination browsing, and
 // transfer with a printed summary. It is the entry point cmd/scpick calls
-// for `scpick pull`.
-func RunPull() error {
+// for `scpick pull`. When recursive is true, whole directories may be
+// selected during browsing and are downloaded recursively (like scp -r).
+func RunPull(recursive bool) error {
 	client, err := connect()
 	if err != nil {
 		return err
 	}
 	defer func() { _ = client.Close() }()
 
-	remoteFiles, err := BrowseRemoteFiles(client, "/")
+	selection, err := BrowseRemoteFiles(client, "/", recursive)
 	if err != nil {
 		return fmt.Errorf("select remote file(s): %w", err)
 	}
@@ -40,7 +41,12 @@ func RunPull() error {
 		return fmt.Errorf("select local destination: %w", err)
 	}
 
-	result := Pull(client, remoteFiles, localDir, DefaultConfirmOverwrite, DefaultProgressPrinter)
+	var result Result
+	if len(selection.Directories) > 0 {
+		result = recursivePull(client, selection.Files, selection.Directories, localDir, DefaultConfirmOverwrite, DefaultProgressPrinter)
+	} else {
+		result = Pull(client, selection.Files, localDir, DefaultConfirmOverwrite, DefaultProgressPrinter)
+	}
 	printSummary(result)
 	if len(result.Failed) > 0 {
 		return fmt.Errorf("%d file(s) failed to transfer", len(result.Failed))
@@ -51,8 +57,9 @@ func RunPull() error {
 // RunPush drives the full interactive push flow: host selection,
 // authentication, local file browsing, remote destination browsing, and
 // transfer with a printed summary. It is the entry point cmd/scpick calls
-// for `scpick push`.
-func RunPush() error {
+// for `scpick push`. When recursive is true, whole directories may be
+// selected during browsing and are uploaded recursively (like scp -r).
+func RunPush(recursive bool) error {
 	client, err := connect()
 	if err != nil {
 		return err
@@ -63,7 +70,7 @@ func RunPush() error {
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
 	}
-	localFiles, err := BrowseLocalFiles(localStart)
+	selection, err := BrowseLocalFiles(localStart, recursive)
 	if err != nil {
 		return fmt.Errorf("select local file(s): %w", err)
 	}
@@ -73,7 +80,12 @@ func RunPush() error {
 		return fmt.Errorf("select remote destination: %w", err)
 	}
 
-	result := Push(client, localFiles, remoteDir, DefaultConfirmOverwrite, DefaultProgressPrinter)
+	var result Result
+	if len(selection.Directories) > 0 {
+		result = recursivePush(client, selection.Files, selection.Directories, remoteDir, DefaultConfirmOverwrite, DefaultProgressPrinter)
+	} else {
+		result = Push(client, selection.Files, remoteDir, DefaultConfirmOverwrite, DefaultProgressPrinter)
+	}
 	printSummary(result)
 	if len(result.Failed) > 0 {
 		return fmt.Errorf("%d file(s) failed to transfer", len(result.Failed))

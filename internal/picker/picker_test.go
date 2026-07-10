@@ -13,7 +13,7 @@ func TestBuildFileList(t *testing.T) {
 		{Name: "sub1", Path: "/dir/sub1", IsDir: true},
 	}
 
-	got := BuildFileList(entries, "/parent")
+	got := BuildFileList(entries, "/parent", "/dir", false)
 
 	want := []ListItem{
 		{Label: "..", Path: "/parent", IsDir: true},
@@ -28,10 +28,38 @@ func TestBuildFileList(t *testing.T) {
 }
 
 func TestBuildFileListEmpty(t *testing.T) {
-	got := BuildFileList(nil, "/parent")
+	got := BuildFileList(nil, "/parent", "/dir", false)
 	want := []ListItem{{Label: "..", Path: "/parent", IsDir: true}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("BuildFileList(nil) = %+v, want %+v", got, want)
+	}
+}
+
+func TestBuildFileListRecursive(t *testing.T) {
+	entries := []Entry{
+		{Name: "a.txt", Path: "/dir/a.txt", IsDir: false},
+		{Name: "sub1", Path: "/dir/sub1", IsDir: true},
+	}
+
+	got := BuildFileList(entries, "/parent", "/dir", true)
+
+	want := []ListItem{
+		{Label: "..", Path: "/parent", IsDir: true},
+		{Label: "★ transfer this directory", Path: "/dir", IsMarker: true},
+		{Label: "sub1", Path: "/dir/sub1", IsDir: true},
+		{Label: "a.txt", Path: "/dir/a.txt", IsDir: false},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("BuildFileList(recursive) = %+v, want %+v", got, want)
+	}
+}
+
+func TestBuildFileListNonRecursiveNoMarker(t *testing.T) {
+	got := BuildFileList(nil, "/parent", "/dir", false)
+	for _, item := range got {
+		if item.IsMarker {
+			t.Errorf("BuildFileList(recursive=false) must not include a marker, got %+v", got)
+		}
 	}
 }
 

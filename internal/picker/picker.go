@@ -28,16 +28,22 @@ type ListItem struct {
 }
 
 const (
-	parentLabel     = ".."
-	useThisDirLabel = "★ use this dir"
+	parentLabel          = ".."
+	useThisDirLabel      = "★ use this dir"
+	transferThisDirLabel = "★ transfer this directory"
 )
 
 // BuildFileList produces the list for file-pick mode: a leading ".." entry
-// pointing at parentDir, then directories (alphabetical), then files
-// (alphabetical).
-func BuildFileList(entries []Entry, parentDir string) []ListItem {
-	items := make([]ListItem, 0, len(entries)+1)
+// pointing at parentDir, then (if recursive) a "transfer this directory"
+// marker for currentDir, then directories (alphabetical), then files
+// (alphabetical). The marker is only present when recursive is true, so a
+// directory can never be picked as a transfer target outside recursive mode.
+func BuildFileList(entries []Entry, parentDir, currentDir string, recursive bool) []ListItem {
+	items := make([]ListItem, 0, len(entries)+2)
 	items = append(items, ListItem{Label: parentLabel, Path: parentDir, IsDir: true})
+	if recursive {
+		items = append(items, ListItem{Label: transferThisDirLabel, Path: currentDir, IsMarker: true})
+	}
 
 	dirs, files := splitAndSort(entries)
 	for _, e := range dirs {

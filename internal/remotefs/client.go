@@ -49,6 +49,15 @@ func Dial(addr, user string, methods []ssh.AuthMethod, hostKeyCB ssh.HostKeyCall
 	return &Client{ssh: sshClient, sftp: sftpClient}, nil
 }
 
+// MkdirAll creates path and any missing parent directories on the remote
+// host, like os.MkdirAll.
+func (c *Client) MkdirAll(path string) error {
+	if err := c.sftp.MkdirAll(path); err != nil {
+		return fmt.Errorf("remotefs: mkdir %q: %w", path, err)
+	}
+	return nil
+}
+
 // Close shuts down the SFTP session and the underlying SSH connection.
 func (c *Client) Close() error {
 	sftpErr := c.sftp.Close()

@@ -29,6 +29,7 @@ Windows 端末と Linux 端末の両方から同じ体験で操作したい。
   - `github.com/kevinburke/ssh_config` — `~/.ssh/config` の Host エントリ読み込み
   - `github.com/ktr0731/go-fuzzyfinder` — fzf 風の対話選択 UI（外部 fzf バイナリ不要）
   - `golang.org/x/term` — パスワードのマスク入力
+  - `github.com/spf13/cobra` — サブコマンド・フラグ解析、`--help` の自動生成
 - ビルド: `CGO_ENABLED=0` の静的バイナリ。Windows/Linux 双方をクロスコンパイルで生成する。
 
 ## Commands
@@ -120,8 +121,8 @@ func (c *Client) ListDir(path string) ([]Entry, error) {
   パスフレーズを一切ログ・標準出力に出さない。デフォルトでは `known_hosts` による
   ホスト鍵検証を行う
 - **Ask first**: 上記リスト以外の外部依存を追加する。`InsecureIgnoreHostKey` を
-  デフォルト動作にする変更。サブコマンド名やCLIのフラグ構成を変更する。
-  S3・FTP など対象プロトコルを追加する
+  デフォルト動作にする変更。サブコマンド名を変更する、または `-r`/`--recursive`
+  以外のフラグを追加する。S3・FTP など対象プロトコルを追加する
 - **Never**: 秘密鍵・パスワード・テスト用認証情報をリポジトリにコミットする。
   ホスト鍵の不一致を警告なしに通す。ユーザーの確認なしにリモート/ローカルのファイルを
   削除する（本ツールは転送専用で削除機能は持たない）

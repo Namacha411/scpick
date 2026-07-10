@@ -13,6 +13,7 @@ type remoteFile interface {
 	Stat(path string) (remotefs.Entry, error)
 	Download(remotePath, localPath string, onProgress remotefs.ProgressFunc) error
 	Upload(localPath, remotePath string, onProgress remotefs.ProgressFunc) error
+	MkdirAll(path string) error
 }
 
 // Result is the outcome of a Pull or Push call over a batch of files.

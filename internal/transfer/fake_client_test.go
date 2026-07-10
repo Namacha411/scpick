@@ -11,12 +11,24 @@ import (
 type fakeClient struct {
 	stat     map[string]remotefs.Entry
 	statErr  map[string]error
+	listDir  func(path string) ([]remotefs.Entry, error)
+	mkdirAll func(path string) error
 	download func(remotePath, localPath string, onProgress remotefs.ProgressFunc) error
 	upload   func(localPath, remotePath string, onProgress remotefs.ProgressFunc) error
 }
 
-func (f *fakeClient) ListDir(string) ([]remotefs.Entry, error) {
+func (f *fakeClient) ListDir(path string) ([]remotefs.Entry, error) {
+	if f.listDir != nil {
+		return f.listDir(path)
+	}
 	return nil, fmt.Errorf("fakeClient: ListDir not used in this test")
+}
+
+func (f *fakeClient) MkdirAll(path string) error {
+	if f.mkdirAll != nil {
+		return f.mkdirAll(path)
+	}
+	return nil
 }
 
 func (f *fakeClient) Stat(path string) (remotefs.Entry, error) {

@@ -39,9 +39,20 @@ go run ./cmd/scpick pull
 go run ./cmd/scpick push
 ```
 
-There are no CLI flags — `pull`/`push` are fully interactive (host, then path
-selection, one directory level at a time). This is intentional per SPEC.md's
-Boundaries: don't add flags or change subcommand names without asking first.
+The CLI is built on `github.com/spf13/cobra` (`cmd/scpick/main.go`), which
+provides `--help` on the root command and on `pull`/`push` for free. Host,
+remote path, and local path are still chosen entirely through the
+interactive picker, one directory level at a time — there are no path
+arguments. The one flag that exists is `-r`/`--recursive` on both `pull` and
+`push`, enabling whole-directory transfer (`scp -r` equivalent): when set,
+the file browser (`internal/picker.BuildFileList`) offers a
+"★ transfer this directory" marker at each level, letting the user pick the
+current directory as a whole instead of only navigating into it or picking
+individual files. Without `-r`, that marker is never shown, so a directory
+can never reach `Pull`/`Push` — the recursive-transfer code path
+(`internal/transfer/recursive.go`) is only ever exercised when the flag is
+set. Changing subcommand names, or adding flags beyond this, still needs to
+be asked about first per SPEC.md's Boundaries.
 
 ## Architecture
 
@@ -58,11 +69,21 @@ auth, remotefs, localfs, picker}` (the actual mechanics).
   `push.go` do the actual per-file transfer loop: overwrite confirmation (with a
   "yes to all" `overwriteGate` that persists across the batch) and progress
   reporting, never aborting the whole batch on one file's error — failures
-  accumulate in `Result.Failed` and the loop continues.
+  accumulate in `Result.Failed` and the loop continues. `recursive.go` builds
+  whole-directory transfer on top of `Pull`/`Push` rather than changing their
+  loops: it walks a directory tree one level at a time (via `ListDir`/
+  `localfs.ListDir`), creates the matching destination directory at each level
+  (`os.MkdirAll` locally, the new `remoteFile.MkdirAll` remotely), calls the
+  existing `Pull`/`Push` for that level's files, and merges every level's
+  `Result` together — sharing one `overwriteGate`-wrapped confirm closure
+  across the whole tree so "yes to all" persists across subdirectories, not
+  just within one `Pull`/`Push` call.
 - **`internal/picker`** is deliberately split in two: `picker.go` has pure,
   fully unit-tested list-generation (`BuildFileList`/`BuildDirList` — dirs
   before files, a `..` entry, and a "★ use this dir" marker for directory-pick
-  mode), and `ui.go` is a thin, untested shim around go-fuzzyfinder
+  mode; `BuildFileList` also takes a `recursive bool` that, when true, adds a
+  "★ transfer this directory" marker for picking a whole directory as a
+  transfer target), and `ui.go` is a thin, untested shim around go-fuzzyfinder
   (`PickFiles`/`PickOne`). Never merge TUI-invoking code into the pure list
   builders — that split is what makes this package testable without a
   terminal.
