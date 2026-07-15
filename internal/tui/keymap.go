@@ -19,7 +19,7 @@ var helpGroups = []keyBindingGroup{
 		Title: "Browse",
 		Bindings: []keyBinding{
 			{"j / k", "move cursor down / up"},
-			{"h", "go to parent directory"},
+			{"h / - / backspace", "go to parent directory"},
 			{"l / enter", "open directory"},
 			{"Tab", "switch focus between panes"},
 			{"y", "yank marked entries (or the one under the cursor)"},

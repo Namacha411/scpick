@@ -124,6 +124,23 @@ func TestDescendIntoDirectoryThenAscendBack(t *testing.T) {
 	}
 }
 
+func TestDashAndBackspaceAlsoAscend(t *testing.T) {
+	parent := t.TempDir()
+	child := filepath.Join(parent, "child")
+	if err := os.Mkdir(child, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, key := range []tea.KeyMsg{keyMsg("-"), {Type: tea.KeyBackspace}} {
+		m := newModelAt(t, child)
+		newModel, _ := m.updateBrowse(key)
+		got := newModel.(model)
+		if got.local.path != parent {
+			t.Fatalf("key %v: local.path = %q, want %q", key, got.local.path, parent)
+		}
+	}
+}
+
 func TestDescendOnParentEntryAscends(t *testing.T) {
 	parent := t.TempDir()
 	child := filepath.Join(parent, "child")
@@ -174,6 +191,7 @@ func TestAscendAndDescendAreNoopsOnDisconnectedRemotePane(t *testing.T) {
 
 func TestUpdateBrowseUnknownKeyIsNoop(t *testing.T) {
 	m := NewModel()
+	m.mode = ModeBrowse
 	m.sshHosts = []sshconf.Host{{Name: "example"}}
 	newModel, cmd := m.updateBrowse(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("z")})
 	got := newModel.(model)

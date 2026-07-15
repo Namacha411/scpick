@@ -147,10 +147,14 @@ func (m model) updateConnectEvent(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status = fmt.Sprintf("connected to %s", m.pendingHost.Name)
 		m.errMsg = ""
 		m.mode = ModeBrowse
-		if entries, err := listRemoteEntries(m.remoteClient, "/"); err != nil {
+		startDir := "/"
+		if home, err := m.remoteClient.Getwd(); err == nil {
+			startDir = home
+		}
+		if entries, err := listRemoteEntries(m.remoteClient, startDir); err != nil {
 			m.errMsg = err.Error()
 		} else {
-			m.remote.path = "/"
+			m.remote.path = startDir
 			m.remote.entries = entries
 			m.remote.cursor = 0
 		}

@@ -44,7 +44,7 @@ func (m model) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.moveCursor(1)
 	case "k", "up":
 		return m.moveCursor(-1)
-	case "h", "left":
+	case "h", "left", "-", "backspace":
 		return m.ascend()
 	case "l", "right", "enter":
 		return m.descend()

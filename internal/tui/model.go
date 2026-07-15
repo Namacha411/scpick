@@ -133,11 +133,22 @@ func (y yankBuffer) count() int {
 	return len(y.files) + len(y.dirs)
 }
 
+// Fallback terminal size used only until the first tea.WindowSizeMsg
+// arrives (bubbletea sends one immediately on startup, so this is mostly
+// defensive).
+const (
+	defaultTermWidth  = 80
+	defaultTermHeight = 24
+)
+
 // model is scpick's top-level bubbletea model.
 type model struct {
 	local  paneState
 	remote paneState
 	focus  int // 0 = local, 1 = remote
+
+	termWidth  int
+	termHeight int
 
 	mode mode
 
@@ -187,13 +198,18 @@ type model struct {
 
 // NewModel builds the initial model: the local pane starts at the current
 // working directory, listed immediately; the remote pane starts
-// disconnected and empty.
+// disconnected and empty. Since connecting to a remote host is the near-
+// universal first action, startup goes straight into ModeHostSelect
+// (equivalent to pressing "C" immediately) instead of requiring it — Esc
+// backs out to plain Browse mode if that's not wanted.
 func NewModel() model {
 	cwd, err := workingDir()
 	m := model{
-		local:     paneState{path: cwd},
-		remote:    paneState{path: ""},
-		textInput: textinput.New(),
+		local:      paneState{path: cwd},
+		remote:     paneState{path: ""},
+		textInput:  textinput.New(),
+		termWidth:  defaultTermWidth,
+		termHeight: defaultTermHeight,
 	}
 	if err != nil {
 		m.errMsg = err.Error()
@@ -205,7 +221,9 @@ func NewModel() model {
 		return m
 	}
 	m.local.entries = entries
-	return m
+
+	newModel, _ := m.openHostSelect()
+	return newModel.(model)
 }
 
 func (m model) Init() tea.Cmd {
@@ -216,6 +234,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		return m.updateKey(msg)
+	case tea.WindowSizeMsg:
+		m.termWidth = msg.Width
+		m.termHeight = msg.Height
+		return m, nil
 	case passwordNeededMsg, hostKeyNeededMsg, connectResultMsg:
 		return m.updateConnectEvent(msg)
 	case transferProgressMsg, transferDoneMsg:

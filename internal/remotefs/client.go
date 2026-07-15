@@ -49,6 +49,17 @@ func Dial(addr, user string, methods []ssh.AuthMethod, hostKeyCB ssh.HostKeyCall
 	return &Client{ssh: sshClient, sftp: sftpClient}, nil
 }
 
+// Getwd returns the remote server's initial working directory for this
+// session, which OpenSSH's sftp-server (and most SFTP servers) resolves to
+// the authenticated user's home directory.
+func (c *Client) Getwd() (string, error) {
+	dir, err := c.sftp.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("remotefs: getwd: %w", err)
+	}
+	return dir, nil
+}
+
 // MkdirAll creates path and any missing parent directories on the remote
 // host, like os.MkdirAll.
 func (c *Client) MkdirAll(path string) error {

@@ -61,6 +61,7 @@ func TestYankSelectionOnParentEntryIsNoop(t *testing.T) {
 
 func TestBeginPasteRequiresNonEmptyYank(t *testing.T) {
 	m := NewModel()
+	m.mode = ModeBrowse
 	newModel, _ := m.beginPaste()
 	got := newModel.(model)
 	if got.mode != ModeBrowse {
@@ -70,6 +71,7 @@ func TestBeginPasteRequiresNonEmptyYank(t *testing.T) {
 
 func TestBeginPasteRejectsSameSourceAndDestPane(t *testing.T) {
 	m := NewModel()
+	m.mode = ModeBrowse
 	m.yank = yankBuffer{sourcePane: 0, files: []string{"/some/file"}}
 	m.focus = 0
 
@@ -85,6 +87,7 @@ func TestBeginPasteRejectsSameSourceAndDestPane(t *testing.T) {
 
 func TestBeginPasteRequiresConnection(t *testing.T) {
 	m := NewModel()
+	m.mode = ModeBrowse
 	m.yank = yankBuffer{sourcePane: 0, files: []string{"/some/file"}}
 	m.focus = 1 // remote, but remoteClient is nil
 
