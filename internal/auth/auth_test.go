@@ -33,6 +33,28 @@ func genSigner(t *testing.T) ssh.Signer {
 	return signer
 }
 
+func TestNewAuthChainWithPasswordUsesInjectedCallback(t *testing.T) {
+	var gotPrompt string
+	ac, err := NewAuthChainWithPassword(func(prompt string) (string, error) {
+		gotPrompt = prompt
+		return "injected-secret", nil
+	})
+	if err != nil {
+		t.Fatalf("NewAuthChainWithPassword: %v", err)
+	}
+
+	got, err := ac.passwordFunc("some prompt: ")
+	if err != nil {
+		t.Fatalf("passwordFunc: %v", err)
+	}
+	if got != "injected-secret" {
+		t.Fatalf("passwordFunc returned %q, want %q", got, "injected-secret")
+	}
+	if gotPrompt != "some prompt: " {
+		t.Fatalf("passwordFunc got prompt %q, want %q", gotPrompt, "some prompt: ")
+	}
+}
+
 func TestCollectSignersPrefersAgent(t *testing.T) {
 	dir := t.TempDir()
 	// A key file is present too, to prove the agent takes priority: its

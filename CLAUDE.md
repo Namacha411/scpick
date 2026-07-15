@@ -19,7 +19,7 @@ GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -o bin/scpick     ./cmd/scpick
 
 # unit tests (no live SSH server needed)
 go test ./...
-go test ./internal/picker/... -run TestBuildDirList -v   # single test
+go test ./internal/tui/... -run TestUpdateFilterNarrowsVisibleEntriesAsYouType -v   # single test
 
 # integration tests (spins up an in-process SSH/SFTP server, see internal/sshtest)
 go test -tags=integration ./...
@@ -33,110 +33,103 @@ CC="zig cc" CGO_ENABLED=1 CGO_LDFLAGS="-lapi-ms-win-core-synch-l1-2-0" go test .
 gofmt -l .
 go vet ./...
 golangci-lint run ./...
-
-# run interactively
-go run ./cmd/scpick pull
-go run ./cmd/scpick push
 ```
 
-The CLI is built on `github.com/spf13/cobra` (`cmd/scpick/main.go`), which
-provides `--help` on the root command and on `pull`/`push` for free. Host,
-remote path, and local path are still chosen entirely through the
-interactive picker, one directory level at a time — there are no path
-arguments. The one flag that exists is `-r`/`--recursive` on both `pull` and
-`push`, enabling whole-directory transfer (`scp -r` equivalent): when set,
-the file browser (`internal/picker.BuildFileList`) offers a
-"★ transfer this directory" marker at each level, letting the user pick the
-current directory as a whole instead of only navigating into it or picking
-individual files. Without `-r`, that marker is never shown, so a directory
-can never reach `Pull`/`Push` — the recursive-transfer code path
-(`internal/transfer/recursive.go`) is only ever exercised when the flag is
-set. Changing subcommand names, or adding flags beyond this, still needs to
-be asked about first per SPEC.md's Boundaries.
+The CLI is a single `tea.NewProgram(tui.NewModel(), tea.WithAltScreen()).Run()` call in
+`cmd/scpick/main.go` — no flags, no subcommands. Host, remote path, and local path are
+all chosen through the always-visible dual-pane TUI; direction (upload vs. download) is
+implied by which pane you last yanked from (`y`), never by a flag. Whole-directory
+transfer is inherent to yanking a directory (always recursive, via
+`transfer.RecursivePull`/`RecursivePush`) — there is no `-r`/`--recursive` flag to ask
+about anymore.
 
 ## Architecture
 
-Call chain: `cmd/scpick` (routing only) → `internal/transfer` (assembles
-everything: host pick → auth → connect → browse → transfer) → `internal/{sshconf,
-auth, remotefs, localfs, picker}` (the actual mechanics).
+Call chain: `cmd/scpick` (starts the bubbletea program, nothing else) →
+`internal/tui` (owns all state and all key handling) → `internal/{auth, remotefs,
+localfs, sshconf, transfer}` (the actual mechanics, unchanged in spirit from before the
+TUI rewrite — see each package's own doc comment for its role).
 
-- **`internal/transfer`** is the orchestrator, not a thin package. `run.go` has
-  `RunPull`/`RunPush` (the real entry points cmd/scpick calls), host selection
-  (`~/.ssh/config` list + manual entry), and known_hosts wiring. `browse.go` has
-  the repeat-list-then-pick navigation loop shared by both remote and local
-  browsing — it adapts `localfs.ListDir` and `*remotefs.Client.ListDir` to a
-  common `picker.Entry` shape so one loop implementation drives both. `pull.go`/
-  `push.go` do the actual per-file transfer loop: overwrite confirmation (with a
-  "yes to all" `overwriteGate` that persists across the batch) and progress
-  reporting, never aborting the whole batch on one file's error — failures
-  accumulate in `Result.Failed` and the loop continues. `recursive.go` builds
-  whole-directory transfer on top of `Pull`/`Push` rather than changing their
-  loops: it walks a directory tree one level at a time (via `ListDir`/
-  `localfs.ListDir`), creates the matching destination directory at each level
-  (`os.MkdirAll` locally, the new `remoteFile.MkdirAll` remotely), calls the
-  existing `Pull`/`Push` for that level's files, and merges every level's
-  `Result` together — sharing one `overwriteGate`-wrapped confirm closure
-  across the whole tree so "yes to all" persists across subdirectories, not
-  just within one `Pull`/`Push` call.
-- **`internal/picker`** is deliberately split in two: `picker.go` has pure,
-  fully unit-tested list-generation (`BuildFileList`/`BuildDirList` — dirs
-  before files, a `..` entry, and a "★ use this dir" marker for directory-pick
-  mode; `BuildFileList` also takes a `recursive bool` that, when true, adds a
-  "★ transfer this directory" marker for picking a whole directory as a
-  transfer target), and `ui.go` is a thin, untested shim around go-fuzzyfinder
-  (`PickFiles`/`PickOne`). Never merge TUI-invoking code into the pure list
-  builders — that split is what makes this package testable without a
-  terminal.
-- **`internal/auth`**'s chain is agent-then-key-files-then-password, but
-  implemented as exactly two `ssh.AuthMethod`s (not three): a single
-  `ssh.PublicKeysCallback` that tries agent signers first and only falls back
-  to loading (and prompting passphrases for) local key files if the agent
-  produced zero signers, followed by a `ssh.PasswordCallback`. This is
-  deliberate — `x/crypto/ssh` dedupes auth methods by RFC method name
-  ("publickey"/"password"), so agent and key-file logic must live inside one
-  callback, not as separate AuthMethod entries. ssh-agent connection is
-  platform-split: `agent_unix.go` dials `SSH_AUTH_SOCK`, `agent_windows.go`
-  dials the OpenSSH Windows named pipe via `github.com/Microsoft/go-winio`
-  (Pageant is not supported). `known_hosts.go` wraps `knownhosts.New`'s
-  callback to distinguish "unknown host" (prompts via an injectable
-  `ConfirmFunc`, then appends to the file) from a genuine mismatch (always
-  aborts, never prompts).
-- **`internal/localfs`** hides the Windows/Linux root difference behind a
-  `DrivesMarker` sentinel path (`"<drives>"`): `GetParentDir` of a Windows
-  drive root returns the marker, and `ListDir(DrivesMarker)` lists available
-  drive letters instead of a real directory. Platform-specific bits
-  (`ListDrives`, `isDriveRoot`) live in `windows.go`/`unix.go` behind build
-  tags.
-- **`internal/remotefs`** wraps `pkg/sftp`; `remoteFile` in
-  `internal/transfer/transfer.go` is a narrow interface over it (`ListDir`,
-  `Stat`, `Download`, `Upload`) so `Pull`/`Push` are unit-testable against a
-  fake without a live server — see `fake_client_test.go`.
-- **`internal/sshtest`** is a real (non-`_test.go`) package containing an
-  in-process SSH+SFTP server (`golang.org/x/crypto/ssh` server + `pkg/sftp`'s
-  `InMemHandler`), used only by `-tags=integration` tests in `auth`,
-  `remotefs`, and `transfer`. It's never imported by non-test code, so it
-  never ends up in the shipped binary despite not being test-tagged itself.
-- Terminal I/O gotcha (see `internal/transfer/terminal.go`): never read a
-  plain prompt via `bufio.Reader` over `os.Stdin` after a `picker.Pick*` call.
-  go-fuzzyfinder puts the terminal in raw mode, and depending on platform that
-  isn't reliably restored to a normal cooked/echoing state afterward — the
-  prompt silently drops keystrokes. Every interactive text prompt (manual host
-  entry, host-key trust, overwrite confirmation) goes through `readLine()`,
-  which explicitly does `term.MakeRaw` → `term.NewTerminal(...).ReadLine()` →
-  `term.Restore` itself instead of trusting inherited terminal state.
+- **`internal/tui`** is a `mode`-driven `tea.Model` (`model.go`): one `paneState` per
+  side (`local`, `remote`), each holding its current directory, listing, cursor
+  (indexing into the *visible*, possibly filtered, subset — see `paneState.
+  visibleIndices()`), and a `selected map[int]bool` keyed by real entry index so marks
+  survive filtering. `browse.go` dispatches Browse-mode keys (`j/k/h/l/Tab/y/p/Space/v/
+  /`/`?`/`C`/`q`); `visual.go` and `filter.go` handle the two sub-modes Space/`v` and `/`
+  drop into; `hostselect.go` drives host-list/manual-entry/password/host-key-confirm as
+  bubbletea modes instead of blocking terminal prompts; `transfer_modal.go` drives the
+  batch-wide overwrite confirm and progress display; `view.go` renders everything with
+  `lipgloss`; `help.go` renders the `?` screen from the static tables in `keymap.go`;
+  `entry.go` holds the unified `paneEntry` type (replacing the old `internal/picker.
+  Entry`/`ListItem`) plus the local/remote listing adapters and the `sahilm/fuzzy`
+  integration.
+- **Async pattern** (`connect.go`, `transfer_modal.go`): SSH handshakes and SFTP
+  transfers are blocking I/O that must not freeze bubbletea's `Update` loop, and their
+  callbacks (`auth`'s password prompt, `auth.ConfirmFunc`, `transfer.ConfirmOverwrite`,
+  `transfer.ProgressPrinter`) fire synchronously inside that blocking call. Both files
+  use the same shape: a `tea.Cmd` spawns a **detached goroutine** that does the real
+  work and returns immediately (so the `Cmd` itself never blocks bubbletea), while a
+  paired `waitForConnectEvent`/`waitForTransferEvent` `tea.Cmd` blocks on a
+  `chan tea.Msg` for whatever that goroutine sends next. Every time `Update` receives a
+  non-terminal event (`passwordNeededMsg`, `hostKeyNeededMsg`, `transferProgressMsg`) it
+  re-issues the wait `Cmd` so the next event gets picked up; a terminal event
+  (`connectResultMsg`, `transferDoneMsg`) does not re-arm it. Connect additionally needs
+  a live back-and-forth (the goroutine blocks on `<-passwordAnswer`/`<-hostKeyAnswer`
+  until `Update` sends the user's reply down that channel from `ModePasswordPrompt`/
+  `ModeHostKeyConfirm`); transfer does not, since the batch-wide overwrite decision
+  (`o`/`s`/`Esc`, see SPEC.md's Open Questions on this being a single choice for the
+  whole paste rather than per-file) is fixed *before* the transfer starts, via a
+  `fixedOverwrite(decision)` closure — no round trip needed once the transfer is
+  running.
+- **`internal/auth`** gained one addition for the TUI: `NewAuthChainWithPassword(
+  passwordFunc)` (auth.go), so a caller can supply a password callback that shows a
+  masked `bubbles/textinput` modal instead of the original `NewAuthChain()`'s
+  `term.ReadPassword` (kept as the default for any future non-TUI caller).
+  `auth.HostKeyCallback`'s `ConfirmFunc` was already injectable and needed no change.
+- **`internal/transfer`**: `Pull`, `Push`, `transfer.go`'s types (`Result`,
+  `OverwriteDecision`, `ConfirmOverwrite`, `ProgressPrinter`, `overwriteGate`) are
+  unchanged from before the rewrite — they never depended on the UI. `recursive.go`'s
+  `recursivePull`/`recursivePush` were renamed to `RecursivePull`/`RecursivePush`
+  (exported) since they're now called from the separate `internal/tui` package instead
+  of from same-package orchestration code. `run.go`, `browse.go`, `terminal.go`, and the
+  terminal-prompt halves of `defaults.go` (`DefaultConfirmOverwrite`/
+  `DefaultProgressPrinter`) are gone — that whole layer was sequential-prompt UI glue
+  superseded by `internal/tui`; `formatBytes` is the only survivor from `defaults.go`.
+- **`internal/picker`** no longer exists. Its pure list-ordering logic (dirs before
+  files, alphabetical within each group) lived entirely in `localfs.ListDir`/
+  `remotefs.Client.ListDir` already, so `internal/tui/entry.go` only had to add the
+  leading `".."` entry and the `sahilm/fuzzy` filter — the marker-based "pick a
+  directory as the target" concept (`★ use this dir` / `★ transfer this directory`)
+  doesn't exist in the dual-pane design, since a pane's current directory *is* the
+  transfer target, always.
+- **`internal/localfs`**, **`internal/remotefs`**, **`internal/sshconf`**,
+  **`internal/sshtest`** are unchanged; none of them ever depended on the picker/cobra
+  UI layer.
 
 ## Testing Strategy
 
-Coverage is intentionally uneven by design, not by neglect: pure logic
-(`sshconf` config parsing, `picker`'s list builders, `transfer`'s
-`Pull`/`Push`/`overwriteGate`) is unit-tested at or near 100%, while TUI-
-driving code (`picker/ui.go`, `transfer/browse.go`'s navigation loops) and raw
-terminal I/O (`transfer/terminal.go`, `transfer/defaults.go`,
-`auth`'s `readPassword`/`dialAgent`) sit at 0% and are exercised manually
-instead. Don't chase coverage numbers on those files — SPEC.md sets no
-numeric target for the TUI/IO boundary.
+`internal/tui`'s `Update*` functions are unit-tested the same way the rest of the
+codebase tests pure logic: construct a `model`, send it a `tea.KeyMsg` (see the
+`keyMsg()` helper in `hostselect_test.go`), and assert on the returned `model`'s state
+— no real terminal needed, since bubbletea's `Model` is a plain struct. Tests that need
+a real directory tree use `t.TempDir()` (see `newModelAt`/`newModelWithThreeFiles`/
+`newModelWithNamedFiles` in `browse_test.go`/`visual_test.go`/`filter_test.go`).
+`view_test.go`'s `TestViewDoesNotPanicInAnyMode` is a smoke test only — `View()`'s
+rendered output is not asserted on beyond "didn't panic, isn't empty", per SPEC.md.
 
-Never commit private keys, passwords, or test credentials to the repo — this
-holds even for test fixtures. Tests that need a private key generate one at
-runtime in a `t.TempDir()` (see `internal/auth/keyfile_test.go`'s
-`genTestKeyPEM`); nothing under `testdata/` is a real credential.
+Anything that needs a real `*remotefs.Client` (the connect success path listing the
+remote root; `startTransferWorker` actually calling `Pull`/`Push`/`RecursivePull`/
+`RecursivePush` against a live SFTP session) is a `-tags=integration` test in
+`internal/tui/integration_test.go`, using the same `internal/sshtest` in-process
+SSH+SFTP server as `internal/auth`/`internal/remotefs`/`internal/transfer`'s own
+integration tests. This split matters here specifically because `dialHost()`
+(`connect.go`) resolves `~/.ssh/known_hosts` from the real user's home directory (like
+the original `run.go` did) — a unit test must never exercise that path, since it would
+read or write the developer's actual `known_hosts` file as a side effect.
+
+**Known gap**: SPEC.md's Boundaries section requires deleting partial destination files
+when a transfer is cancelled, but there is currently no way to cancel a transfer once
+`ModeTransferProgress` starts (no `Esc` handling, no cancellation channel threaded into
+`transfer.Pull`/`Push`/`Download`/`Upload`). This predates the TUI rewrite — the
+original terminal-driven flow had no cancellation path either — but it remains
+unimplemented and should be picked up as a follow-up.

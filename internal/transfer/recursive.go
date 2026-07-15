@@ -9,12 +9,12 @@ import (
 	"scpick/internal/localfs"
 )
 
-// recursivePull downloads remoteFiles (as Pull does) plus, for each entry
+// RecursivePull downloads remoteFiles (as Pull does) plus, for each entry
 // in remoteDirs, the whole directory tree rooted there, preserving
 // structure under localDestDir. A single overwriteGate is shared across
 // every file and every directory level, so an "overwrite all" answer
 // persists for the whole batch, not just one directory.
-func recursivePull(client remoteFile, remoteFiles, remoteDirs []string, localDestDir string, confirm ConfirmOverwrite, progress ProgressPrinter) Result {
+func RecursivePull(client remoteFile, remoteFiles, remoteDirs []string, localDestDir string, confirm ConfirmOverwrite, progress ProgressPrinter) Result {
 	result := Result{Failed: make(map[string]error)}
 	gate := &overwriteGate{}
 	wrappedConfirm := func(destPath string, existingSize, newSize int64) OverwriteDecision {
@@ -30,8 +30,8 @@ func recursivePull(client remoteFile, remoteFiles, remoteDirs []string, localDes
 	return result
 }
 
-// recursivePush mirrors recursivePull for uploads.
-func recursivePush(client remoteFile, localFiles, localDirs []string, remoteDestDir string, confirm ConfirmOverwrite, progress ProgressPrinter) Result {
+// RecursivePush mirrors RecursivePull for uploads.
+func RecursivePush(client remoteFile, localFiles, localDirs []string, remoteDestDir string, confirm ConfirmOverwrite, progress ProgressPrinter) Result {
 	result := Result{Failed: make(map[string]error)}
 	gate := &overwriteGate{}
 	wrappedConfirm := func(destPath string, existingSize, newSize int64) OverwriteDecision {

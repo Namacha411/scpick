@@ -30,15 +30,27 @@ type AuthChain struct {
 }
 
 // NewAuthChain builds an AuthChain rooted at the current user's ~/.ssh
-// directory.
+// directory, prompting for passwords/passphrases by reading them directly
+// from the terminal. Callers that don't own the terminal (e.g. a bubbletea
+// TUI, which puts the terminal in raw/alt-screen mode itself) should use
+// NewAuthChainWithPassword instead and supply their own prompt.
 func NewAuthChain() (*AuthChain, error) {
+	return NewAuthChainWithPassword(readPassword)
+}
+
+// NewAuthChainWithPassword builds an AuthChain rooted at the current user's
+// ~/.ssh directory, using passwordFunc to obtain passwords and encrypted-key
+// passphrases instead of reading the terminal directly. passwordFunc is
+// called with a human-readable prompt (e.g. "user@host's password: ") and
+// must return the entered text.
+func NewAuthChainWithPassword(passwordFunc func(prompt string) (string, error)) (*AuthChain, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("auth: new chain: %w", err)
 	}
 	return &AuthChain{
 		keyDir:       filepath.Join(home, ".ssh"),
-		passwordFunc: readPassword,
+		passwordFunc: passwordFunc,
 		dialAgent: func() (agentSigner, error) {
 			return dialAgent()
 		},

@@ -43,7 +43,7 @@ func TestRecursivePullNestedTree(t *testing.T) {
 	client.stat["/remote/backup/a.txt"] = remotefs.Entry{Name: "a.txt", Size: 1}
 	client.stat["/remote/backup/sub/b.txt"] = remotefs.Entry{Name: "b.txt", Size: 1}
 
-	result := recursivePull(client, nil, []string{"/remote/backup"}, destDir, alwaysYes, nil)
+	result := RecursivePull(client, nil, []string{"/remote/backup"}, destDir, alwaysYes, nil)
 
 	if len(result.Failed) != 0 {
 		t.Fatalf("unexpected failures: %v", result.Failed)
@@ -70,7 +70,7 @@ func TestRecursivePullMixedFilesAndDirs(t *testing.T) {
 	client.stat["/remote/top.txt"] = remotefs.Entry{Name: "top.txt", Size: 1}
 	client.stat["/remote/dir/c.txt"] = remotefs.Entry{Name: "c.txt", Size: 1}
 
-	result := recursivePull(client, []string{"/remote/top.txt"}, []string{"/remote/dir"}, destDir, alwaysYes, nil)
+	result := RecursivePull(client, []string{"/remote/top.txt"}, []string{"/remote/dir"}, destDir, alwaysYes, nil)
 
 	if len(result.Failed) != 0 {
 		t.Fatalf("unexpected failures: %v", result.Failed)
@@ -119,7 +119,7 @@ func TestRecursivePullOverwriteAllPersistsAcrossDirectories(t *testing.T) {
 		return OverwriteAll
 	}
 
-	result := recursivePull(client, nil, []string{"/remote/backup"}, destDir, confirm, nil)
+	result := RecursivePull(client, nil, []string{"/remote/backup"}, destDir, confirm, nil)
 
 	if confirmCalls != 1 {
 		t.Errorf("confirm called %d times, want 1 (yes-to-all should persist across subdirectories)", confirmCalls)
@@ -157,7 +157,7 @@ func TestRecursivePushNestedTree(t *testing.T) {
 		},
 	}
 
-	result := recursivePush(client, nil, []string{backupDir}, "/remote/dest", alwaysYes, nil)
+	result := RecursivePush(client, nil, []string{backupDir}, "/remote/dest", alwaysYes, nil)
 
 	if len(result.Failed) != 0 {
 		t.Fatalf("unexpected failures: %v", result.Failed)
