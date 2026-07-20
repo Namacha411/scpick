@@ -25,9 +25,12 @@ func Push(client remoteFile, localFiles []string, remoteDestDir string, confirm 
 		}
 
 		if existing, err := client.Stat(remotePath); err == nil {
-			if gate.decide(confirm, remotePath, existing.Size, info.Size()) == OverwriteSkip {
+			switch gate.decide(confirm, remotePath, existing.Size, info.Size()) {
+			case OverwriteSkip:
 				result.Skipped = append(result.Skipped, localPath)
 				continue
+			case OverwriteRename:
+				remotePath = uniqueRemotePath(client, remotePath)
 			}
 		}
 

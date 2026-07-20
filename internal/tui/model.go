@@ -9,6 +9,7 @@ import (
 
 	"scpick/internal/remotefs"
 	"scpick/internal/sshconf"
+	"scpick/internal/transfer"
 )
 
 // mode identifies which screen/dialog is currently driving key input.
@@ -32,8 +33,9 @@ const (
 	// ModeHostKeyConfirm asks whether to trust an unknown host key,
 	// requested by the in-flight connection attempt.
 	ModeHostKeyConfirm
-	// ModeTransferConfirm asks, once for the whole paste, how to handle
-	// any destination file that already exists.
+	// ModeTransferConfirm asks how to handle a destination file that
+	// already exists. It only appears once an in-flight transfer actually
+	// hits a conflict; the answer then applies to the rest of the batch.
 	ModeTransferConfirm
 	// ModeTransferProgress shows progress while a paste's transfer is in
 	// flight.
@@ -183,12 +185,20 @@ type model struct {
 	visualSnapshot map[int]bool
 
 	// In-flight transfer plumbing: transferEvents carries
-	// transferProgressMsg/transferDoneMsg back from the background
-	// transfer goroutine.
+	// transferProgressMsg/conflictNeededMsg/transferDoneMsg back from the
+	// background transfer goroutine; conflictAnswer carries the user's
+	// overwrite/skip/rename reply back to it.
 	transferEvents chan tea.Msg
+	conflictAnswer chan transfer.OverwriteDecision
 	transferLabel  string
 	transferDone   int64
 	transferTotal  int64
+
+	// conflictDestPath/conflictExistingSize/conflictNewSize describe the
+	// in-flight conflict ModeTransferConfirm is currently showing.
+	conflictDestPath     string
+	conflictExistingSize int64
+	conflictNewSize      int64
 
 	status string
 	errMsg string
@@ -240,7 +250,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case passwordNeededMsg, hostKeyNeededMsg, connectResultMsg:
 		return m.updateConnectEvent(msg)
-	case transferProgressMsg, transferDoneMsg:
+	case transferProgressMsg, conflictNeededMsg, transferDoneMsg:
 		return m.updateTransferEvent(msg)
 	}
 	return m, nil

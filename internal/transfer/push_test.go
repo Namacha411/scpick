@@ -82,6 +82,59 @@ func TestPushOverwriteSkip(t *testing.T) {
 	}
 }
 
+func TestPushOverwriteRenameCreatesNumberedFile(t *testing.T) {
+	srcDir := t.TempDir()
+	localPath := writeLocalFile(t, srcDir, "a.txt", "hello")
+
+	var uploadedTo string
+	client := &fakeClient{
+		stat: map[string]remotefs.Entry{
+			"/remote/a.txt": {Name: "a.txt", Size: 3},
+		},
+		upload: func(lp, remotePath string, onProgress remotefs.ProgressFunc) error {
+			uploadedTo = remotePath
+			return nil
+		},
+	}
+
+	confirm := func(string, int64, int64) OverwriteDecision { return OverwriteRename }
+	result := Push(client, []string{localPath}, "/remote", confirm, nil)
+
+	if len(result.Succeeded) != 1 || result.Succeeded[0] != localPath {
+		t.Fatalf("Succeeded = %v, want [%s]", result.Succeeded, localPath)
+	}
+	if uploadedTo != "/remote/a (1).txt" {
+		t.Errorf("uploaded to %q, want /remote/a (1).txt", uploadedTo)
+	}
+}
+
+func TestPushOverwriteRenameIncrementsWhenNumberedNameAlsoExists(t *testing.T) {
+	srcDir := t.TempDir()
+	localPath := writeLocalFile(t, srcDir, "a.txt", "hello")
+
+	var uploadedTo string
+	client := &fakeClient{
+		stat: map[string]remotefs.Entry{
+			"/remote/a.txt":     {Name: "a.txt", Size: 3},
+			"/remote/a (1).txt": {Name: "a (1).txt", Size: 3},
+		},
+		upload: func(lp, remotePath string, onProgress remotefs.ProgressFunc) error {
+			uploadedTo = remotePath
+			return nil
+		},
+	}
+
+	confirm := func(string, int64, int64) OverwriteDecision { return OverwriteRename }
+	result := Push(client, []string{localPath}, "/remote", confirm, nil)
+
+	if len(result.Succeeded) != 1 {
+		t.Fatalf("Succeeded = %v, want 1 file", result.Succeeded)
+	}
+	if uploadedTo != "/remote/a (2).txt" {
+		t.Errorf("uploaded to %q, want /remote/a (2).txt", uploadedTo)
+	}
+}
+
 func TestPushPartialFailureContinues(t *testing.T) {
 	srcDir := t.TempDir()
 	goodPath := writeLocalFile(t, srcDir, "good.txt", "hello")

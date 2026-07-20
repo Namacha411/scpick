@@ -25,9 +25,12 @@ func Pull(client remoteFile, remoteFiles []string, localDestDir string, confirm 
 		}
 
 		if existing, err := os.Stat(localPath); err == nil {
-			if gate.decide(confirm, localPath, existing.Size(), info.Size) == OverwriteSkip {
+			switch gate.decide(confirm, localPath, existing.Size(), info.Size) {
+			case OverwriteSkip:
 				result.Skipped = append(result.Skipped, remotePath)
 				continue
+			case OverwriteRename:
+				localPath = uniqueLocalPath(localPath)
 			}
 		}
 

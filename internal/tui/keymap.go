@@ -52,9 +52,10 @@ var helpGroups = []keyBindingGroup{
 	{
 		Title: "Transfer confirm",
 		Bindings: []keyBinding{
-			{"o", "overwrite any existing destination files in this paste"},
-			{"s", "skip any existing destination files in this paste"},
-			{"esc", "cancel the paste"},
+			{"o", "overwrite this (and every later) existing destination file in the paste"},
+			{"s", "skip this (and every later) existing destination file in the paste"},
+			{"enter", "keep both: rename this (and every later) file with a numbered suffix"},
+			{"esc", "skip this and every remaining conflicting file"},
 		},
 	},
 }

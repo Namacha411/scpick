@@ -114,6 +114,93 @@ func TestPullOverwriteAllAppliesToRestOfBatch(t *testing.T) {
 	}
 }
 
+func TestPullOverwriteRenameCreatesNumberedFile(t *testing.T) {
+	destDir := t.TempDir()
+	existingPath := filepath.Join(destDir, "a.txt")
+	if err := os.WriteFile(existingPath, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	client := &fakeClient{
+		stat: map[string]remotefs.Entry{
+			"/remote/a.txt": {Name: "a.txt", Size: 5},
+		},
+		download: func(remotePath, localPath string, onProgress remotefs.ProgressFunc) error {
+			return os.WriteFile(localPath, []byte("hello"), 0o644)
+		},
+	}
+
+	confirm := func(string, int64, int64) OverwriteDecision { return OverwriteRename }
+	result := Pull(client, []string{"/remote/a.txt"}, destDir, confirm, nil)
+
+	if len(result.Succeeded) != 1 || result.Succeeded[0] != "/remote/a.txt" {
+		t.Fatalf("Succeeded = %v, want [/remote/a.txt]", result.Succeeded)
+	}
+	if data, err := os.ReadFile(existingPath); err != nil || string(data) != "old" {
+		t.Fatalf("original file changed: data=%q err=%v", data, err)
+	}
+	renamedPath := filepath.Join(destDir, "a (1).txt")
+	if data, err := os.ReadFile(renamedPath); err != nil || string(data) != "hello" {
+		t.Fatalf("renamed file not created or wrong content: data=%q err=%v", data, err)
+	}
+}
+
+func TestPullOverwriteRenameIncrementsWhenNumberedNameAlsoExists(t *testing.T) {
+	destDir := t.TempDir()
+	for _, name := range []string{"a.txt", "a (1).txt"} {
+		if err := os.WriteFile(filepath.Join(destDir, name), []byte("old"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	client := &fakeClient{
+		stat: map[string]remotefs.Entry{
+			"/remote/a.txt": {Name: "a.txt", Size: 5},
+		},
+		download: func(remotePath, localPath string, onProgress remotefs.ProgressFunc) error {
+			return os.WriteFile(localPath, []byte("hello"), 0o644)
+		},
+	}
+
+	confirm := func(string, int64, int64) OverwriteDecision { return OverwriteRename }
+	result := Pull(client, []string{"/remote/a.txt"}, destDir, confirm, nil)
+
+	if len(result.Succeeded) != 1 {
+		t.Fatalf("Succeeded = %v, want 1 file", result.Succeeded)
+	}
+	renamedPath := filepath.Join(destDir, "a (2).txt")
+	if data, err := os.ReadFile(renamedPath); err != nil || string(data) != "hello" {
+		t.Fatalf("expected a (2).txt with downloaded content, got data=%q err=%v", data, err)
+	}
+}
+
+func TestPullOverwriteRenameDotfile(t *testing.T) {
+	destDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(destDir, ".gitignore"), []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	client := &fakeClient{
+		stat: map[string]remotefs.Entry{
+			"/remote/.gitignore": {Name: ".gitignore", Size: 3},
+		},
+		download: func(remotePath, localPath string, onProgress remotefs.ProgressFunc) error {
+			return os.WriteFile(localPath, []byte("new"), 0o644)
+		},
+	}
+
+	confirm := func(string, int64, int64) OverwriteDecision { return OverwriteRename }
+	result := Pull(client, []string{"/remote/.gitignore"}, destDir, confirm, nil)
+
+	if len(result.Succeeded) != 1 {
+		t.Fatalf("Succeeded = %v, want 1 file", result.Succeeded)
+	}
+	renamedPath := filepath.Join(destDir, ".gitignore (1)")
+	if data, err := os.ReadFile(renamedPath); err != nil || string(data) != "new" {
+		t.Fatalf("dotfile renamed incorrectly: expected .gitignore (1), got data=%q err=%v", data, err)
+	}
+}
+
 func TestPullPartialFailureContinues(t *testing.T) {
 	destDir := t.TempDir()
 	client := &fakeClient{

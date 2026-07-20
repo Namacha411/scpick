@@ -101,18 +101,95 @@ func TestBeginPasteRequiresConnection(t *testing.T) {
 	}
 }
 
-func TestUpdateTransferConfirmEscCancels(t *testing.T) {
-	m := NewModel()
-	m.mode = ModeTransferConfirm
-	m.yank = yankBuffer{sourcePane: 1, files: []string{"/some/file"}}
-
-	newModel, cmd := m.updateTransferConfirm(keyMsg("esc"))
-	got := newModel.(model)
-	if got.mode != ModeBrowse {
-		t.Fatalf("mode = %v, want ModeBrowse", got.mode)
+func TestUpdateTransferConfirmSendsAnswer(t *testing.T) {
+	tests := []struct {
+		key  string
+		want transfer.OverwriteDecision
+	}{
+		{"o", transfer.OverwriteYes},
+		{"s", transfer.OverwriteSkip},
+		{"enter", transfer.OverwriteRename},
+		{"esc", transfer.OverwriteSkip},
 	}
-	if cmd != nil {
-		t.Fatal("expected no command on cancel")
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			m := NewModel()
+			m.mode = ModeTransferConfirm
+			m.conflictAnswer = make(chan transfer.OverwriteDecision, 1)
+
+			newModel, cmd := m.updateTransferConfirm(keyMsg(tt.key))
+			got := newModel.(model)
+			if got.mode != ModeTransferProgress {
+				t.Fatalf("mode = %v, want ModeTransferProgress", got.mode)
+			}
+			if cmd == nil {
+				t.Fatal("expected a command to send the answer")
+			}
+			cmd()
+
+			select {
+			case decision := <-m.conflictAnswer:
+				if decision != tt.want {
+					t.Fatalf("decision = %v, want %v", decision, tt.want)
+				}
+			default:
+				t.Fatal("expected a decision to be sent on conflictAnswer")
+			}
+		})
+	}
+}
+
+func TestInteractiveOverwriteAsksOnceThenReusesAnswer(t *testing.T) {
+	events := make(chan tea.Msg, 1)
+	answers := make(chan transfer.OverwriteDecision, 1)
+	confirm := interactiveOverwrite(events, answers)
+
+	answers <- transfer.OverwriteRename
+	got := confirm("/dest/a.txt", 3, 5)
+	if got != transfer.OverwriteRename {
+		t.Fatalf("first decision = %v, want OverwriteRename", got)
+	}
+	select {
+	case msg := <-events:
+		conflict, ok := msg.(conflictNeededMsg)
+		if !ok {
+			t.Fatalf("event = %T, want conflictNeededMsg", msg)
+		}
+		if conflict.destPath != "/dest/a.txt" || conflict.existingSize != 3 || conflict.newSize != 5 {
+			t.Fatalf("conflict = %+v, want destPath=/dest/a.txt existingSize=3 newSize=5", conflict)
+		}
+	default:
+		t.Fatal("expected a conflictNeededMsg on the first call")
+	}
+
+	// Second call for a different file must reuse the first answer without
+	// touching events/answers again.
+	got = confirm("/dest/b.txt", 1, 1)
+	if got != transfer.OverwriteRename {
+		t.Fatalf("second decision = %v, want OverwriteRename (reused)", got)
+	}
+	select {
+	case msg := <-events:
+		t.Fatalf("unexpected second event: %+v", msg)
+	default:
+	}
+}
+
+func TestUpdateTransferEventConflictSwitchesToConfirm(t *testing.T) {
+	m := NewModel()
+	m.mode = ModeTransferProgress
+	m.transferEvents = make(chan tea.Msg, 1)
+
+	newModel, cmd := m.updateTransferEvent(conflictNeededMsg{destPath: "/dest/a.txt", existingSize: 3, newSize: 5})
+	got := newModel.(model)
+	if got.mode != ModeTransferConfirm {
+		t.Fatalf("mode = %v, want ModeTransferConfirm", got.mode)
+	}
+	if got.conflictDestPath != "/dest/a.txt" || got.conflictExistingSize != 3 || got.conflictNewSize != 5 {
+		t.Fatalf("conflict fields = %q %d/%d, want /dest/a.txt 3/5", got.conflictDestPath, got.conflictExistingSize, got.conflictNewSize)
+	}
+	if cmd == nil {
+		t.Fatal("expected updateTransferEvent to re-arm the event listener")
 	}
 }
 

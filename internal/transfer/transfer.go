@@ -30,7 +30,8 @@ type OverwriteDecision int
 const (
 	OverwriteSkip OverwriteDecision = iota
 	OverwriteYes
-	OverwriteAll // yes to this file and every remaining file in the batch
+	OverwriteAll    // yes to this file and every remaining file in the batch
+	OverwriteRename // keep both: transfer under a new, non-colliding numbered name
 )
 
 // ConfirmOverwrite is asked what to do when destPath already exists.
