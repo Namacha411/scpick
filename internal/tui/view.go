@@ -9,11 +9,13 @@ import (
 )
 
 var (
-	paneStyle       = lipgloss.NewStyle().Padding(0, 1).BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("240"))
-	activePaneStyle = paneStyle.BorderForeground(lipgloss.Color("205"))
-	statusStyle     = lipgloss.NewStyle().Faint(true)
-	errStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	cursorStyle     = lipgloss.NewStyle().Reverse(true)
+	paneStyle         = lipgloss.NewStyle().Padding(0, 1).BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("240"))
+	activePaneStyle   = paneStyle.BorderForeground(lipgloss.Color("205"))
+	statusStyle       = lipgloss.NewStyle().Faint(true)
+	errStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	cursorStyle       = lipgloss.NewStyle().Reverse(true)
+	markedStyle       = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214"))
+	cursorMarkedStyle = cursorStyle.Bold(true).Foreground(lipgloss.Color("214"))
 )
 
 // paneChromeWidth is how much of a pane's rendered width is border (1 each
@@ -105,7 +107,7 @@ func renderPaneFrame(header string, pane *paneState, active bool, width, height 
 		} else {
 			name = "  " + name
 		}
-		lines = append(lines, renderListRow(truncateName(name, width-2), pos == pane.cursor))
+		lines = append(lines, renderListRow(truncateName(name, width-2), pos == pane.cursor, pane.isSelected(i)))
 	}
 	// Pad with blank rows so every pane is exactly `height` rows tall
 	// regardless of how many entries it holds — otherwise the border
@@ -152,20 +154,30 @@ func (m model) viewHostSelect() string {
 	b.WriteString("Select a host (from ~/.ssh/config):\n\n")
 	for i, h := range m.sshHosts {
 		line := fmt.Sprintf("%s (%s@%s:%d)", h.Name, h.User, h.Hostname, h.Port)
-		b.WriteString(renderListRow(line, i == m.hostCursor))
+		b.WriteString(renderListRow(line, i == m.hostCursor, false))
 		b.WriteString("\n")
 	}
-	b.WriteString(renderListRow(manualEntryLabel, m.hostCursor == len(m.sshHosts)))
+	b.WriteString(renderListRow(manualEntryLabel, m.hostCursor == len(m.sshHosts), false))
 	b.WriteString("\n\n")
 	b.WriteString(m.renderStatusLine("j/k: move  enter: select  esc: cancel"))
 	return b.String()
 }
 
-func renderListRow(label string, selected bool) string {
-	if selected {
+// renderListRow renders one row of a list, applying the reverse-video
+// cursor style when isCursor, and bolding+coloring it when isMarked (an
+// entry marked with Space/v, so it survives being scrolled past or having
+// the cursor move off it).
+func renderListRow(label string, isCursor, isMarked bool) string {
+	switch {
+	case isCursor && isMarked:
+		return cursorMarkedStyle.Render("> " + label)
+	case isCursor:
 		return cursorStyle.Render("> " + label)
+	case isMarked:
+		return markedStyle.Render("  " + label)
+	default:
+		return "  " + label
 	}
-	return "  " + label
 }
 
 func (m model) viewManualHost() string {
