@@ -24,6 +24,9 @@ cd scpick
 go build -o bin/scpick ./cmd/scpick
 ```
 
+`go install ./cmd/scpick` works too, and puts the binary in `$(go env GOPATH)/bin`
+instead of `./bin` — handy if that directory is already on your `PATH`.
+
 Cross-compile for either platform (always `CGO_ENABLED=0` — the binary must
 stay dependency-free):
 
