@@ -135,6 +135,27 @@ func (y yankBuffer) count() int {
 	return len(y.files) + len(y.dirs)
 }
 
+// has reports whether path, read from pane, is currently sitting in the
+// yank buffer waiting to be pasted. The buffer isn't cleared on paste (so
+// the same yank can be pasted into more than one place), so this stays
+// true until a new "y" replaces it.
+func (y yankBuffer) has(pane int, path string) bool {
+	if y.sourcePane != pane {
+		return false
+	}
+	for _, f := range y.files {
+		if f == path {
+			return true
+		}
+	}
+	for _, d := range y.dirs {
+		if d == path {
+			return true
+		}
+	}
+	return false
+}
+
 // Fallback terminal size used only until the first tea.WindowSizeMsg
 // arrives (bubbletea sends one immediately on startup, so this is mostly
 // defensive).

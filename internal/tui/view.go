@@ -63,8 +63,8 @@ func (m model) viewBrowse() string {
 
 	width := m.paneWidth()
 	height := m.paneContentHeight()
-	left := renderPaneFrame(localHeader, &m.local, m.focus == 0, width, height)
-	right := renderPaneFrame(remoteHeader, &m.remote, m.focus == 1, width, height)
+	left := renderPaneFrame(localHeader, &m.local, m.focus == 0, width, height, 0, m.yank)
+	right := renderPaneFrame(remoteHeader, &m.remote, m.focus == 1, width, height, 1, m.yank)
 	panes := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 
 	hint := "j/k: move  h/l: dir  Tab: switch  y/p: yank/paste  Space/v: select  /: filter  C: connect  q: quit"
@@ -77,7 +77,7 @@ func (m model) viewBrowse() string {
 	return panes + "\n" + m.renderStatusLine(hint)
 }
 
-func renderPaneFrame(header string, pane *paneState, active bool, width, height int) string {
+func renderPaneFrame(header string, pane *paneState, active bool, width, height, focus int, yank yankBuffer) string {
 	style := paneStyle
 	if active {
 		style = activePaneStyle
@@ -102,12 +102,17 @@ func renderPaneFrame(header string, pane *paneState, active bool, width, height 
 		if e.IsDir && !e.IsParent {
 			name += "/"
 		}
-		if pane.isSelected(i) {
+		// An entry is highlighted either while marked with Space/v (pending
+		// a "y") or, after "y", while it's sitting in the yank buffer
+		// waiting for "p" — the yank buffer outlives the mark, which is
+		// cleared the moment "y" is pressed.
+		highlighted := pane.isSelected(i) || (!e.IsParent && yank.has(focus, joinSourcePath(focus, pane.path, e.Name)))
+		if highlighted {
 			name = "* " + name
 		} else {
 			name = "  " + name
 		}
-		lines = append(lines, renderListRow(truncateName(name, width-2), pos == pane.cursor, pane.isSelected(i)))
+		lines = append(lines, renderListRow(truncateName(name, width-2), pos == pane.cursor, highlighted))
 	}
 	// Pad with blank rows so every pane is exactly `height` rows tall
 	// regardless of how many entries it holds — otherwise the border

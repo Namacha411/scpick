@@ -26,3 +26,20 @@ func TestNewModelHostSelectCanBeDismissedToBrowse(t *testing.T) {
 		t.Fatalf("mode = %v, want ModeBrowse after Esc", got.mode)
 	}
 }
+
+func TestYankBufferHasMatchesFilesAndDirsOnTheirSourcePane(t *testing.T) {
+	y := yankBuffer{sourcePane: 0, files: []string{"/a/f.txt"}, dirs: []string{"/a/d"}}
+
+	if !y.has(0, "/a/f.txt") {
+		t.Error("expected a file's path on its source pane to match")
+	}
+	if !y.has(0, "/a/d") {
+		t.Error("expected a dir's path on its source pane to match")
+	}
+	if y.has(1, "/a/f.txt") {
+		t.Error("expected no match on the other pane, even with the same path")
+	}
+	if y.has(0, "/a/other.txt") {
+		t.Error("expected no match for a path not in the buffer")
+	}
+}
