@@ -86,4 +86,9 @@ summary (succeeded/skipped/failed) is shown when it's done.
 ## Development
 
 See `SPEC.md` for the full design spec and `CLAUDE.md` for architecture
-notes and common commands (build, test, lint).
+notes and common commands (build, test, lint). Contributions are welcome —
+see `CONTRIBUTING.md` to get started.
+
+## License
+
+MIT — see `LICENSE`.
