@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestWindowSizeMsgUpdatesModel(t *testing.T) {
@@ -73,5 +74,20 @@ func TestTruncateNameShortensWithEllipsis(t *testing.T) {
 func TestTruncateNameLeavesShortNamesAlone(t *testing.T) {
 	if got := truncateName("short.txt", 20); got != "short.txt" {
 		t.Fatalf("truncateName = %q, want unchanged", got)
+	}
+}
+
+// Wide East-Asian characters take 2 terminal cells each, so a 10-rune CJK
+// name is 20 cells wide: too wide for a rune-count-only truncation to catch
+// even though it "fits" by rune count, which used to let lipgloss's own
+// cell-width-aware word-wrap silently add an extra row to just this pane.
+func TestTruncateNameAccountsForWideCharacterCellWidth(t *testing.T) {
+	name := "日本語のファイル名です" // 11 runes, 22 cells
+	got := truncateName(name, 20)
+	if w := ansi.StringWidth(got); w > 20 {
+		t.Fatalf("truncateName(%q, 20) = %q, width = %d cells, want <= 20", name, got, w)
+	}
+	if got[len(got)-len("…"):] != "…" {
+		t.Fatalf("truncateName = %q, want to end with an ellipsis", got)
 	}
 }

@@ -20,8 +20,9 @@ type paneEntry struct {
 
 const parentEntryName = ".."
 
-// listLocalEntries lists dir on the local filesystem, prefixed with a ".."
-// entry. localfs.ListDir already sorts directories first, then files, each
+// listLocalEntries lists dir on the local filesystem, suffixed with a ".."
+// entry so it lands last and out of the way of the cursor's default resting
+// place. localfs.ListDir already sorts directories first, then files, each
 // group alphabetically.
 func listLocalEntries(dir string) ([]paneEntry, error) {
 	entries, err := localfs.ListDir(dir)
@@ -29,26 +30,27 @@ func listLocalEntries(dir string) ([]paneEntry, error) {
 		return nil, err
 	}
 	out := make([]paneEntry, 0, len(entries)+1)
-	out = append(out, paneEntry{Name: parentEntryName, IsDir: true, IsParent: true})
 	for _, e := range entries {
 		out = append(out, paneEntry{Name: e.Name, IsDir: e.IsDir, Size: e.Size})
 	}
+	out = append(out, paneEntry{Name: parentEntryName, IsDir: true, IsParent: true})
 	return out, nil
 }
 
-// listRemoteEntries lists dir on the connected remote host, prefixed with a
-// ".." entry. client.ListDir already sorts directories first, then files,
-// each group alphabetically.
+// listRemoteEntries lists dir on the connected remote host, suffixed with a
+// ".." entry so it lands last and out of the way of the cursor's default
+// resting place. client.ListDir already sorts directories first, then
+// files, each group alphabetically.
 func listRemoteEntries(client *remotefs.Client, dir string) ([]paneEntry, error) {
 	entries, err := client.ListDir(dir)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]paneEntry, 0, len(entries)+1)
-	out = append(out, paneEntry{Name: parentEntryName, IsDir: true, IsParent: true})
 	for _, e := range entries {
 		out = append(out, paneEntry{Name: e.Name, IsDir: e.IsDir, Size: e.Size})
 	}
+	out = append(out, paneEntry{Name: parentEntryName, IsDir: true, IsParent: true})
 	return out, nil
 }
 

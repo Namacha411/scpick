@@ -15,8 +15,8 @@ func TestYankSelectionRecordsFile(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "file.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	m := newModelAt(t, dir) // entries: [.., file.txt]
-	m.local.cursor = 1
+	m := newModelAt(t, dir) // entries: [file.txt, ..]
+	m.local.cursor = 0
 
 	newModel, _ := m.yankSelection()
 	got := newModel.(model)
@@ -37,8 +37,8 @@ func TestYankSelectionRecordsDirectory(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(dir, "sub"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	m := newModelAt(t, dir) // entries: [.., sub]
-	m.local.cursor = 1
+	m := newModelAt(t, dir) // entries: [sub, ..]
+	m.local.cursor = 0
 
 	newModel, _ := m.yankSelection()
 	got := newModel.(model)

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 var (
@@ -79,7 +80,13 @@ func renderPaneFrame(header string, pane *paneState, active bool, width, height 
 	if active {
 		style = activePaneStyle
 	}
-	style = style.Width(width)
+	// lipgloss's word-wrap wraps to Width() minus the style's own left/right
+	// Padding(0, 1) — i.e. Width(N) gives N-2 cells of actual text room, not
+	// N. width here is already the pure text width (paneWidth already
+	// subtracted padding out of paneChromeWidth), so add the 2 padding
+	// cells back to make lipgloss wrap at exactly `width`, matching what
+	// truncateName below was told to fit into.
+	style = style.Width(width + 2)
 
 	vis := pane.visibleIndices()
 	start, end := visibleWindow(pane.cursor, len(vis), height)
@@ -126,22 +133,18 @@ func visibleWindow(cursor, total, height int) (int, int) {
 	return start, start + height
 }
 
-// truncateName shortens s to fit within width columns, replacing the tail
-// with an ellipsis if it doesn't. width is treated as a rune count, which
-// is an approximation for wide characters but exact for the ASCII
-// filenames this is mostly used for.
+// truncateName shortens s to fit within width terminal cells, replacing the
+// tail with an ellipsis if it doesn't. It measures width the same way
+// lipgloss's own word-wrap does (ansi.StringWidth), accounting for wide
+// East-Asian characters and emoji, so a pane's rendered lines never exceed
+// the width lipgloss was asked to wrap to — a mismatch there previously let
+// lipgloss silently wrap a too-wide line onto an extra terminal row,
+// unbalancing the two panes' heights.
 func truncateName(s string, width int) string {
 	if width < 1 {
 		return ""
 	}
-	r := []rune(s)
-	if len(r) <= width {
-		return s
-	}
-	if width == 1 {
-		return "…"
-	}
-	return string(r[:width-1]) + "…"
+	return ansi.Truncate(s, width, "…")
 }
 
 func (m model) viewHostSelect() string {

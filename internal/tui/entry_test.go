@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestListLocalEntriesLeadsWithParentThenDirsThenFiles(t *testing.T) {
+func TestListLocalEntriesTrailsWithParentAfterDirsThenFiles(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.Mkdir(filepath.Join(dir, "zdir"), 0o755); err != nil {
 		t.Fatal(err)
@@ -26,7 +26,7 @@ func TestListLocalEntriesLeadsWithParentThenDirsThenFiles(t *testing.T) {
 		t.Fatalf("listLocalEntries: %v", err)
 	}
 
-	wantNames := []string{parentEntryName, "adir", "zdir", "afile.txt", "bfile.txt"}
+	wantNames := []string{"adir", "zdir", "afile.txt", "bfile.txt", parentEntryName}
 	if len(entries) != len(wantNames) {
 		t.Fatalf("got %d entries, want %d: %+v", len(entries), len(wantNames), entries)
 	}
@@ -35,15 +35,16 @@ func TestListLocalEntriesLeadsWithParentThenDirsThenFiles(t *testing.T) {
 			t.Errorf("entries[%d].Name = %q, want %q", i, entries[i].Name, want)
 		}
 	}
-	if !entries[0].IsParent || !entries[0].IsDir {
-		t.Errorf("entries[0] = %+v, want IsParent && IsDir", entries[0])
+	last := len(entries) - 1
+	if !entries[last].IsParent || !entries[last].IsDir {
+		t.Errorf("entries[%d] = %+v, want IsParent && IsDir", last, entries[last])
 	}
-	for _, i := range []int{1, 2} {
+	for _, i := range []int{0, 1} {
 		if !entries[i].IsDir {
 			t.Errorf("entries[%d] = %+v, want IsDir", i, entries[i])
 		}
 	}
-	for _, i := range []int{3, 4} {
+	for _, i := range []int{2, 3} {
 		if entries[i].IsDir {
 			t.Errorf("entries[%d] = %+v, want !IsDir", i, entries[i])
 		}

@@ -61,7 +61,7 @@ func TestMoveCursorIsBoundedByEntryCount(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(dir, "sub"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	m := newModelAt(t, dir) // entries: [.., sub] = 2 entries
+	m := newModelAt(t, dir) // entries: [sub, ..] = 2 entries
 
 	newModel, _ := m.updateBrowse(keyMsg("up")) // already at 0, must clamp
 	got := newModel.(model)
@@ -105,8 +105,8 @@ func TestDescendIntoDirectoryThenAscendBack(t *testing.T) {
 	if err := os.Mkdir(child, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	m := newModelAt(t, parent) // entries: [.., child]
-	m.local.cursor = 1         // "child"
+	m := newModelAt(t, parent) // entries: [child, ..]
+	m.local.cursor = 0         // "child"
 
 	newModel, _ := m.updateBrowse(keyMsg("l"))
 	got := newModel.(model)
@@ -162,8 +162,8 @@ func TestDescendOnFileIsNoop(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "file.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	m := newModelAt(t, dir) // entries: [.., file.txt]
-	m.local.cursor = 1
+	m := newModelAt(t, dir) // entries: [file.txt, ..]
+	m.local.cursor = 0
 
 	newModel, _ := m.updateBrowse(keyMsg("l"))
 	got := newModel.(model)

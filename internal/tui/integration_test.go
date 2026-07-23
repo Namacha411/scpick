@@ -42,8 +42,8 @@ func TestIntegrationUpdateConnectEventSuccessListsRemoteRoot(t *testing.T) {
 	if got.remote.path != "/" {
 		t.Fatalf("remote.path = %q, want %q", got.remote.path, "/")
 	}
-	if len(got.remote.entries) == 0 || got.remote.entries[0].Name != parentEntryName {
-		t.Fatalf("remote.entries = %+v, want a leading %q entry", got.remote.entries, parentEntryName)
+	if n := len(got.remote.entries); n == 0 || got.remote.entries[n-1].Name != parentEntryName {
+		t.Fatalf("remote.entries = %+v, want a trailing %q entry", got.remote.entries, parentEntryName)
 	}
 	if cmd != nil {
 		t.Fatal("expected no further listening command on terminal success")
