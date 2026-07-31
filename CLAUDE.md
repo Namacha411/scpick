@@ -11,11 +11,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 go mod tidy
 
 # build (current OS)
-go build -o bin/scpick ./cmd/scpick
+# -ldflags="-s -w" strips the symbol table/DWARF debug info, -trimpath drops
+# local build-machine paths from the binary — both shrink it ~25-30% and
+# don't affect --version (VCS stamping lives outside the stripped sections)
+go build -ldflags="-s -w" -trimpath -o bin/scpick ./cmd/scpick
 
 # cross-compile (must stay CGO_ENABLED=0 — no external ssh/scp/fzf binary, no cgo)
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o bin/scpick.exe ./cmd/scpick
-GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -o bin/scpick     ./cmd/scpick
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o bin/scpick.exe ./cmd/scpick
+GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o bin/scpick     ./cmd/scpick
 
 # unit tests (no live SSH server needed)
 go test ./...

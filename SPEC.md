@@ -59,11 +59,15 @@ Windows 端末と Linux 端末の両方から同じ体験で操作したい。vi
 go mod tidy
 
 # ビルド（現在の OS 向け）
-go build -o bin/scpick ./cmd/scpick
+# -ldflags="-s -w" でシンボルテーブル/DWARFデバッグ情報を除去、-trimpath で
+# ビルド環境のローカル絶対パスを除去。合わせてバイナリサイズが約25〜30%縮む。
+# --version が使う VCS スタンプ情報(vcs.revision等)は別セクションに埋め込まれる
+# ため、これらのフラグでは失われない
+go build -ldflags="-s -w" -trimpath -o bin/scpick ./cmd/scpick
 
 # クロスコンパイル
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o bin/scpick.exe ./cmd/scpick
-GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -o bin/scpick     ./cmd/scpick
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o bin/scpick.exe ./cmd/scpick
+GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o bin/scpick     ./cmd/scpick
 
 # テスト
 go test ./... -race -cover
