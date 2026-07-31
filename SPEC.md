@@ -77,6 +77,10 @@ golangci-lint run ./...
 # 起動
 ./bin/scpick        # ローカル/リモートの2ペインファイラーが起動
 go run ./cmd/scpick  # 開発中の実行
+
+# TUI外で完結する2つのフラグ
+./bin/scpick --version  # ビルド元コミットとビルド日時を表示して終了
+./bin/scpick --help     # 使い方を表示して終了
 ```
 
 ## Project Structure

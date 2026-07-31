@@ -35,9 +35,11 @@ go vet ./...
 golangci-lint run ./...
 ```
 
-There are no flags or subcommands: `cmd/scpick/main.go` just runs
-`tea.NewProgram(tui.NewModel(), tea.WithAltScreen())`. Everything — host, remote path,
-local path, upload vs. download — is chosen through the dual-pane TUI.
+There are no subcommands: `cmd/scpick/main.go` only handles `--version`/`--help`
+before running `tea.NewProgram(tui.NewModel(), tea.WithAltScreen())`. Everything —
+host, remote path, local path, upload vs. download — is chosen through the dual-pane
+TUI. `--version` reports the commit and build time from `runtime/debug.ReadBuildInfo()`
+(the repo's `vX.Y` tags aren't valid semver, so there's no meaningful tag to print).
 
 ## Architecture
 

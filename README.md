@@ -41,7 +41,10 @@ GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -o bin/scpick     ./cmd/scpick
 scpick
 ```
 
-There are no flags or subcommands — everything happens inside the TUI.
+There are no subcommands — everything happens inside the TUI. Two flags exist
+outside of it: `scpick --version` prints the build's commit and build time
+(there's no meaningful semver tag to show), and `scpick --help` prints this
+usage summary.
 
 ### Connecting
 
