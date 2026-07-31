@@ -1,23 +1,25 @@
 package tui
 
-// keyBinding is one row of the help screen: the key(s) that trigger an
+// KeyBinding is one row of the help screen: the key(s) that trigger an
 // action, and a short description of what it does.
-type keyBinding struct {
+type KeyBinding struct {
 	Keys string
 	Desc string
 }
 
-// keyBindingGroup is a named block of related keyBindings, shown together
-// on the help screen.
-type keyBindingGroup struct {
+// KeyBindingGroup is a named block of related KeyBindings, shown together
+// on the help screen. Exported so cmd/scpick can reuse it for `scpick --help`.
+type KeyBindingGroup struct {
 	Title    string
-	Bindings []keyBinding
+	Bindings []KeyBinding
 }
 
-var helpGroups = []keyBindingGroup{
+// HelpGroups is the single source of truth for scpick's keybindings, used by
+// both the in-TUI `?` screen and `scpick --help`.
+var HelpGroups = []KeyBindingGroup{
 	{
 		Title: "Browse",
-		Bindings: []keyBinding{
+		Bindings: []KeyBinding{
 			{"j / k", "move cursor down / up"},
 			{"h / - / backspace", "go to parent directory"},
 			{"l / enter", "open directory"},
@@ -34,7 +36,7 @@ var helpGroups = []keyBindingGroup{
 	},
 	{
 		Title: "Visual mode",
-		Bindings: []keyBinding{
+		Bindings: []KeyBinding{
 			{"j / k", "extend the selection range"},
 			{"y", "yank the selection and return to browse"},
 			{"v", "return to browse, keeping the marks"},
@@ -43,7 +45,7 @@ var helpGroups = []keyBindingGroup{
 	},
 	{
 		Title: "Filter",
-		Bindings: []keyBinding{
+		Bindings: []KeyBinding{
 			{"(type)", "narrow the pane to fuzzy-matching entries"},
 			{"enter", "keep the filter active, return to browse"},
 			{"esc", "clear the filter, return to browse"},
@@ -51,7 +53,7 @@ var helpGroups = []keyBindingGroup{
 	},
 	{
 		Title: "Transfer confirm",
-		Bindings: []keyBinding{
+		Bindings: []KeyBinding{
 			{"o", "overwrite this (and every later) existing destination file in the paste"},
 			{"s", "skip this (and every later) existing destination file in the paste"},
 			{"enter", "keep both: rename this (and every later) file with a numbered suffix"},

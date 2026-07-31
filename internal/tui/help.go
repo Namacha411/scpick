@@ -19,7 +19,7 @@ func (m model) updateHelp(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m model) viewHelp() string {
 	var b strings.Builder
-	for i, group := range helpGroups {
+	for i, group := range HelpGroups {
 		if i > 0 {
 			b.WriteString("\n")
 		}
