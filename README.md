@@ -1,5 +1,9 @@
 # scpick
 
+[![Latest release](https://img.shields.io/github/v/release/Namacha411/scpick)](https://github.com/Namacha411/scpick/releases)
+[![Go version](https://img.shields.io/github/go-mod/go-version/Namacha411/scpick)](go.mod)
+[![License: MIT](https://img.shields.io/github/license/Namacha411/scpick)](LICENSE)
+
 An interactive SCP/SFTP file transfer tool that runs as a single static
 binary on both native Windows (PowerShell, no WSL/Git Bash) and Linux, with
 no dependency on external `ssh`/`scp`/`fzf` binaries.
@@ -9,6 +13,8 @@ on the right — with vim-style keys. Pick a file in one pane, yank it (`y`),
 move to the other pane, and paste (`p`). Direction (upload vs. download)
 follows whichever pane you yanked from; there's no separate "pull"/"push"
 command to remember.
+
+![scpick's dual-pane view: a local directory on the left, a connected remote directory on the right, both browsable with the same vim-style keys](assets/screenshot.png)
 
 ## Install
 
