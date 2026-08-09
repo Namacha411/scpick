@@ -12,6 +12,8 @@ var (
 	paneStyle         = lipgloss.NewStyle().Padding(0, 1).BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("240"))
 	activePaneStyle   = paneStyle.BorderForeground(lipgloss.Color("205"))
 	statusStyle       = lipgloss.NewStyle().Faint(true)
+	visualStatusStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214"))
+	filterStatusStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
 	errStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 	cursorStyle       = lipgloss.NewStyle().Reverse(true)
 	yankedStyle       = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214"))
@@ -68,13 +70,16 @@ func (m model) viewBrowse() string {
 	panes := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 
 	hint := "j/k: move  h/l: dir  Tab: switch  y/p: yank/paste  Space/v: select  /: filter  C: connect  q: quit"
+	hintStyle := statusStyle
 	switch m.mode {
 	case ModeVisual:
 		hint = "VISUAL  j/k: extend  y: yank  esc: cancel  v: done"
+		hintStyle = visualStatusStyle
 	case ModeFilter:
 		hint = fmt.Sprintf("filter: %s   enter: keep  esc: clear", m.textInput.View())
+		hintStyle = filterStatusStyle
 	}
-	return panes + "\n" + m.renderStatusLine(hint)
+	return panes + "\n" + m.renderStatusLine(hint, hintStyle)
 }
 
 func renderPaneFrame(header string, pane *paneState, active bool, width, height, focus int, yank yankBuffer) string {
@@ -165,7 +170,7 @@ func (m model) viewHostSelect() string {
 	}
 	b.WriteString(renderListRow(manualEntryLabel, m.hostCursor == len(m.sshHosts), false))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderStatusLine("j/k: move  enter: select  esc: cancel"))
+	b.WriteString(m.renderStatusLine("j/k: move  enter: select  esc: cancel", statusStyle))
 	return b.String()
 }
 
@@ -197,26 +202,31 @@ func (m model) viewManualHost() string {
 	default:
 		prompt = "Port [22]:"
 	}
-	return fmt.Sprintf("%s\n%s\n\n%s", prompt, m.textInput.View(), m.renderStatusLine("enter: next  esc: back"))
+	return fmt.Sprintf("%s\n%s\n\n%s", prompt, m.textInput.View(), m.renderStatusLine("enter: next  esc: back", statusStyle))
 }
 
 func (m model) viewConnecting() string {
-	return fmt.Sprintf("Connecting to %s...\n\n%s", m.pendingHost.Name, m.renderStatusLine(""))
+	return fmt.Sprintf("Connecting to %s...\n\n%s", m.pendingHost.Name, m.renderStatusLine("", statusStyle))
 }
 
 func (m model) viewPasswordPrompt() string {
-	return fmt.Sprintf("%s\n%s\n\n%s", m.passwordPrompt, m.textInput.View(), m.renderStatusLine("enter: submit  esc: cancel"))
+	return fmt.Sprintf("%s\n%s\n\n%s", m.passwordPrompt, m.textInput.View(), m.renderStatusLine("enter: submit  esc: cancel", statusStyle))
 }
 
 func (m model) viewHostKeyConfirm() string {
 	return fmt.Sprintf(
 		"The authenticity of host %q can't be established.\nKey fingerprint: %s\nTrust this host? [y/N]\n\n%s",
-		m.hostKeyHostname, m.hostKeyFingerprint, m.renderStatusLine(""),
+		m.hostKeyHostname, m.hostKeyFingerprint, m.renderStatusLine("", statusStyle),
 	)
 }
 
-func (m model) renderStatusLine(hint string) string {
-	line := hint
+// renderStatusLine renders the hint text in hintStyle — callers outside
+// viewBrowse always pass statusStyle, but viewBrowse picks a style per mode
+// (see ModeVisual/ModeFilter in viewBrowse) so the current mode is visible
+// at a glance even once nothing is selected — followed by any error or
+// status message, each in their own fixed style.
+func (m model) renderStatusLine(hint string, hintStyle lipgloss.Style) string {
+	line := hintStyle.Render(hint)
 	if m.errMsg != "" {
 		if line != "" {
 			line += "  "
@@ -228,5 +238,5 @@ func (m model) renderStatusLine(hint string) string {
 		}
 		line += statusStyle.Render(m.status)
 	}
-	return statusStyle.Render(line)
+	return line
 }
