@@ -66,9 +66,11 @@ func (m model) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // yankSelection records the pane's marked entries (or, if nothing is
-// marked, just the entry under the cursor) as the yank buffer, replacing
-// any previous yank. Marks are cleared afterward, mirroring cut-after-yank
-// file manager conventions.
+// marked, just the entry under the cursor) as the yank buffer, replacing any
+// previous yank. Marks are left in place (and the cursor fallback item gets
+// newly marked) so a yanked entry keeps showing both the "* " mark prefix
+// and the yank color until it's un-yanked with Space or replaced by another
+// "y".
 func (m model) yankSelection() (tea.Model, tea.Cmd) {
 	pane := m.activePane()
 
@@ -80,6 +82,9 @@ func (m model) yankSelection() (tea.Model, tea.Cmd) {
 	}
 
 	yank := yankBuffer{sourcePane: m.focus}
+	if pane.selected == nil {
+		pane.selected = make(map[int]bool)
+	}
 	for _, i := range indices {
 		entry := pane.entries[i]
 		if entry.IsParent {
@@ -91,12 +96,12 @@ func (m model) yankSelection() (tea.Model, tea.Cmd) {
 		} else {
 			yank.files = append(yank.files, src)
 		}
+		pane.selected[i] = true
 	}
 	if yank.empty() {
 		return m, nil
 	}
 
-	pane.selected = nil
 	m.yank = yank
 	m.status = fmt.Sprintf("yanked %d item(s)", yank.count())
 	return m, nil

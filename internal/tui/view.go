@@ -14,8 +14,8 @@ var (
 	statusStyle       = lipgloss.NewStyle().Faint(true)
 	errStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 	cursorStyle       = lipgloss.NewStyle().Reverse(true)
-	markedStyle       = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214"))
-	cursorMarkedStyle = cursorStyle.Bold(true).Foreground(lipgloss.Color("214"))
+	yankedStyle       = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214"))
+	cursorYankedStyle = cursorStyle.Bold(true).Foreground(lipgloss.Color("214"))
 )
 
 // paneChromeWidth is how much of a pane's rendered width is border (1 each
@@ -102,17 +102,18 @@ func renderPaneFrame(header string, pane *paneState, active bool, width, height,
 		if e.IsDir && !e.IsParent {
 			name += "/"
 		}
-		// An entry is highlighted either while marked with Space/v (pending
-		// a "y") or, after "y", while it's sitting in the yank buffer
-		// waiting for "p" — the yank buffer outlives the mark, which is
-		// cleared the moment "y" is pressed.
-		highlighted := pane.isSelected(i) || (!e.IsParent && yank.has(focus, joinSourcePath(focus, pane.path, e.Name)))
-		if highlighted {
+		// Marked (Space/v) and yanked (confirmed with "y", waiting for "p")
+		// are independent and often both true at once — "y" no longer
+		// clears marks — so they're shown with separate cues: marked gets
+		// the "* " prefix, yanked gets color.
+		marked := pane.isSelected(i)
+		yanked := !e.IsParent && yank.has(focus, joinSourcePath(focus, pane.path, e.Name))
+		if marked {
 			name = "* " + name
 		} else {
 			name = "  " + name
 		}
-		lines = append(lines, renderListRow(truncateName(name, width-2), pos == pane.cursor, highlighted))
+		lines = append(lines, renderListRow(truncateName(name, width-2), pos == pane.cursor, yanked))
 	}
 	// Pad with blank rows so every pane is exactly `height` rows tall
 	// regardless of how many entries it holds — otherwise the border
@@ -169,17 +170,18 @@ func (m model) viewHostSelect() string {
 }
 
 // renderListRow renders one row of a list, applying the reverse-video
-// cursor style when isCursor, and bolding+coloring it when isMarked (an
-// entry marked with Space/v, so it survives being scrolled past or having
-// the cursor move off it).
-func renderListRow(label string, isCursor, isMarked bool) string {
+// cursor style when isCursor, and bolding+coloring it when isYanked (an
+// entry currently sitting in the yank buffer, waiting for "p"). Marking with
+// Space/v is shown via the "* " prefix the caller adds to label, not by
+// color, so the two selection states stay visually distinct.
+func renderListRow(label string, isCursor, isYanked bool) string {
 	switch {
-	case isCursor && isMarked:
-		return cursorMarkedStyle.Render("> " + label)
+	case isCursor && isYanked:
+		return cursorYankedStyle.Render("> " + label)
 	case isCursor:
 		return cursorStyle.Render("> " + label)
-	case isMarked:
-		return markedStyle.Render("  " + label)
+	case isYanked:
+		return yankedStyle.Render("  " + label)
 	default:
 		return "  " + label
 	}
