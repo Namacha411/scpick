@@ -44,7 +44,7 @@ func TestIntegrationHostKeyCallbackTrustOnFirstUse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second dial (already-known host): %v", err)
 	}
-	conn2.Close()
+	_ = conn2.Close()
 }
 
 func TestIntegrationHostKeyCallbackMismatchAborts(t *testing.T) {
