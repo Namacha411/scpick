@@ -43,3 +43,20 @@ func TestYankBufferHasMatchesFilesAndDirsOnTheirSourcePane(t *testing.T) {
 		t.Error("expected no match for a path not in the buffer")
 	}
 }
+
+func TestYankBufferWithoutRemovesOnlyMatchingPathOnSourcePane(t *testing.T) {
+	y := yankBuffer{sourcePane: 0, files: []string{"/a/f.txt", "/a/g.txt"}, dirs: []string{"/a/d"}}
+
+	got := y.without(0, "/a/f.txt")
+	if got.has(0, "/a/f.txt") {
+		t.Error("expected the removed file to no longer be in the buffer")
+	}
+	if !got.has(0, "/a/g.txt") || !got.has(0, "/a/d") {
+		t.Error("expected other files and dirs to remain in the buffer")
+	}
+
+	unchanged := y.without(1, "/a/f.txt")
+	if !unchanged.has(0, "/a/f.txt") {
+		t.Error("expected without() on a different pane to leave the buffer unchanged")
+	}
+}

@@ -30,6 +30,6 @@ func (m model) viewHelp() string {
 		}
 	}
 	b.WriteString("\n")
-	b.WriteString(m.renderStatusLine("press any key to go back"))
+	b.WriteString(m.renderStatusLine("press any key to go back", statusStyle))
 	return b.String()
 }

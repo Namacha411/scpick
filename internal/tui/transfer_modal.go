@@ -216,7 +216,7 @@ func (m model) viewTransferConfirm() string {
 	return fmt.Sprintf(
 		"%s already exists (%s → %s)\n\n%s",
 		m.conflictDestPath, formatBytesShort(m.conflictExistingSize), formatBytesShort(m.conflictNewSize),
-		m.renderStatusLine("o: overwrite  s: skip  enter: keep both (rename)  esc: skip rest"),
+		m.renderStatusLine("o: overwrite  s: skip  enter: keep both (rename)  esc: skip rest", statusStyle),
 	)
 }
 
@@ -225,7 +225,7 @@ func (m model) viewTransferProgress() string {
 	return fmt.Sprintf(
 		"Transferring %s\n%s %s/%s\n\n%s",
 		m.transferLabel, bar, formatBytesShort(m.transferDone), formatBytesShort(m.transferTotal),
-		m.renderStatusLine(""),
+		m.renderStatusLine("", statusStyle),
 	)
 }
 

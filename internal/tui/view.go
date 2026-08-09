@@ -12,10 +12,12 @@ var (
 	paneStyle         = lipgloss.NewStyle().Padding(0, 1).BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("240"))
 	activePaneStyle   = paneStyle.BorderForeground(lipgloss.Color("205"))
 	statusStyle       = lipgloss.NewStyle().Faint(true)
+	visualStatusStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214"))
+	filterStatusStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
 	errStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 	cursorStyle       = lipgloss.NewStyle().Reverse(true)
-	markedStyle       = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214"))
-	cursorMarkedStyle = cursorStyle.Bold(true).Foreground(lipgloss.Color("214"))
+	yankedStyle       = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214"))
+	cursorYankedStyle = cursorStyle.Bold(true).Foreground(lipgloss.Color("214"))
 )
 
 // paneChromeWidth is how much of a pane's rendered width is border (1 each
@@ -68,13 +70,16 @@ func (m model) viewBrowse() string {
 	panes := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 
 	hint := "j/k: move  h/l: dir  Tab: switch  y/p: yank/paste  Space/v: select  /: filter  C: connect  q: quit"
+	hintStyle := statusStyle
 	switch m.mode {
 	case ModeVisual:
 		hint = "VISUAL  j/k: extend  y: yank  esc: cancel  v: done"
+		hintStyle = visualStatusStyle
 	case ModeFilter:
 		hint = fmt.Sprintf("filter: %s   enter: keep  esc: clear", m.textInput.View())
+		hintStyle = filterStatusStyle
 	}
-	return panes + "\n" + m.renderStatusLine(hint)
+	return panes + "\n" + m.renderStatusLine(hint, hintStyle)
 }
 
 func renderPaneFrame(header string, pane *paneState, active bool, width, height, focus int, yank yankBuffer) string {
@@ -102,17 +107,18 @@ func renderPaneFrame(header string, pane *paneState, active bool, width, height,
 		if e.IsDir && !e.IsParent {
 			name += "/"
 		}
-		// An entry is highlighted either while marked with Space/v (pending
-		// a "y") or, after "y", while it's sitting in the yank buffer
-		// waiting for "p" — the yank buffer outlives the mark, which is
-		// cleared the moment "y" is pressed.
-		highlighted := pane.isSelected(i) || (!e.IsParent && yank.has(focus, joinSourcePath(focus, pane.path, e.Name)))
-		if highlighted {
+		// Marked (Space/v) and yanked (confirmed with "y", waiting for "p")
+		// are independent and often both true at once — "y" no longer
+		// clears marks — so they're shown with separate cues: marked gets
+		// the "* " prefix, yanked gets color.
+		marked := pane.isSelected(i)
+		yanked := !e.IsParent && yank.has(focus, joinSourcePath(focus, pane.path, e.Name))
+		if marked {
 			name = "* " + name
 		} else {
 			name = "  " + name
 		}
-		lines = append(lines, renderListRow(truncateName(name, width-2), pos == pane.cursor, highlighted))
+		lines = append(lines, renderListRow(truncateName(name, width-2), pos == pane.cursor, yanked))
 	}
 	// Pad with blank rows so every pane is exactly `height` rows tall
 	// regardless of how many entries it holds — otherwise the border
@@ -164,22 +170,23 @@ func (m model) viewHostSelect() string {
 	}
 	b.WriteString(renderListRow(manualEntryLabel, m.hostCursor == len(m.sshHosts), false))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderStatusLine("j/k: move  enter: select  esc: cancel"))
+	b.WriteString(m.renderStatusLine("j/k: move  enter: select  esc: cancel", statusStyle))
 	return b.String()
 }
 
 // renderListRow renders one row of a list, applying the reverse-video
-// cursor style when isCursor, and bolding+coloring it when isMarked (an
-// entry marked with Space/v, so it survives being scrolled past or having
-// the cursor move off it).
-func renderListRow(label string, isCursor, isMarked bool) string {
+// cursor style when isCursor, and bolding+coloring it when isYanked (an
+// entry currently sitting in the yank buffer, waiting for "p"). Marking with
+// Space/v is shown via the "* " prefix the caller adds to label, not by
+// color, so the two selection states stay visually distinct.
+func renderListRow(label string, isCursor, isYanked bool) string {
 	switch {
-	case isCursor && isMarked:
-		return cursorMarkedStyle.Render("> " + label)
+	case isCursor && isYanked:
+		return cursorYankedStyle.Render("> " + label)
 	case isCursor:
 		return cursorStyle.Render("> " + label)
-	case isMarked:
-		return markedStyle.Render("  " + label)
+	case isYanked:
+		return yankedStyle.Render("  " + label)
 	default:
 		return "  " + label
 	}
@@ -195,26 +202,31 @@ func (m model) viewManualHost() string {
 	default:
 		prompt = "Port [22]:"
 	}
-	return fmt.Sprintf("%s\n%s\n\n%s", prompt, m.textInput.View(), m.renderStatusLine("enter: next  esc: back"))
+	return fmt.Sprintf("%s\n%s\n\n%s", prompt, m.textInput.View(), m.renderStatusLine("enter: next  esc: back", statusStyle))
 }
 
 func (m model) viewConnecting() string {
-	return fmt.Sprintf("Connecting to %s...\n\n%s", m.pendingHost.Name, m.renderStatusLine(""))
+	return fmt.Sprintf("Connecting to %s...\n\n%s", m.pendingHost.Name, m.renderStatusLine("", statusStyle))
 }
 
 func (m model) viewPasswordPrompt() string {
-	return fmt.Sprintf("%s\n%s\n\n%s", m.passwordPrompt, m.textInput.View(), m.renderStatusLine("enter: submit  esc: cancel"))
+	return fmt.Sprintf("%s\n%s\n\n%s", m.passwordPrompt, m.textInput.View(), m.renderStatusLine("enter: submit  esc: cancel", statusStyle))
 }
 
 func (m model) viewHostKeyConfirm() string {
 	return fmt.Sprintf(
 		"The authenticity of host %q can't be established.\nKey fingerprint: %s\nTrust this host? [y/N]\n\n%s",
-		m.hostKeyHostname, m.hostKeyFingerprint, m.renderStatusLine(""),
+		m.hostKeyHostname, m.hostKeyFingerprint, m.renderStatusLine("", statusStyle),
 	)
 }
 
-func (m model) renderStatusLine(hint string) string {
-	line := hint
+// renderStatusLine renders the hint text in hintStyle — callers outside
+// viewBrowse always pass statusStyle, but viewBrowse picks a style per mode
+// (see ModeVisual/ModeFilter in viewBrowse) so the current mode is visible
+// at a glance even once nothing is selected — followed by any error or
+// status message, each in their own fixed style.
+func (m model) renderStatusLine(hint string, hintStyle lipgloss.Style) string {
+	line := hintStyle.Render(hint)
 	if m.errMsg != "" {
 		if line != "" {
 			line += "  "
@@ -226,5 +238,5 @@ func (m model) renderStatusLine(hint string) string {
 		}
 		line += statusStyle.Render(m.status)
 	}
-	return statusStyle.Render(line)
+	return line
 }

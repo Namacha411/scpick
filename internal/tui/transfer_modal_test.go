@@ -48,6 +48,21 @@ func TestYankSelectionRecordsDirectory(t *testing.T) {
 	}
 }
 
+func TestYankSelectionMarksCursorFallbackEntry(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "file.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m := newModelAt(t, dir) // entries: [file.txt, ..], nothing marked
+	m.local.cursor = 0
+
+	newModel, _ := m.yankSelection()
+	got := newModel.(model)
+	if !got.local.isSelected(0) {
+		t.Fatal("expected the cursor-fallback entry to be marked after yanking")
+	}
+}
+
 func TestYankSelectionOnParentEntryIsNoop(t *testing.T) {
 	dir := t.TempDir()
 	m := newModelAt(t, dir) // cursor starts on ".."

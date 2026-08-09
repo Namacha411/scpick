@@ -40,8 +40,10 @@ const (
 	// ModeTransferProgress shows progress while a paste's transfer is in
 	// flight.
 	ModeTransferProgress
-	// ModeVisual extends a selection range from an anchor as the cursor
-	// moves, on top of whatever was already marked with Space.
+	// ModeVisual extends or retracts a selection range from an anchor as
+	// the cursor moves — the range version of Space, activating entries if
+	// the anchor was inactive when 'v' was pressed, deactivating them
+	// (unmarking and un-yanking) if the anchor was active.
 	ModeVisual
 	// ModeFilter incrementally narrows the focused pane to entries whose
 	// name fuzzy-matches the typed query.
@@ -156,6 +158,27 @@ func (y yankBuffer) has(pane int, path string) bool {
 	return false
 }
 
+// without returns a copy of y with path removed, if it was present on pane.
+// Used by Space to un-yank a single item without touching the rest of the
+// buffer.
+func (y yankBuffer) without(pane int, path string) yankBuffer {
+	if y.sourcePane != pane {
+		return y
+	}
+	out := yankBuffer{sourcePane: y.sourcePane}
+	for _, f := range y.files {
+		if f != path {
+			out.files = append(out.files, f)
+		}
+	}
+	for _, d := range y.dirs {
+		if d != path {
+			out.dirs = append(out.dirs, d)
+		}
+	}
+	return out
+}
+
 // Fallback terminal size used only until the first tea.WindowSizeMsg
 // arrives (bubbletea sends one immediately on startup, so this is mostly
 // defensive).
@@ -199,11 +222,13 @@ type model struct {
 
 	yank yankBuffer
 
-	// visualAnchor and visualSnapshot support ModeVisual: the anchor is the
-	// cursor position when 'v' was pressed, and the snapshot is the
-	// pane's selection at that moment, so Esc can restore it.
-	visualAnchor   int
-	visualSnapshot map[int]bool
+	// visualAnchor, visualSnapshot, and visualYankSnapshot support
+	// ModeVisual: the anchor is the cursor position when 'v' was pressed,
+	// and the snapshots are the pane's selection and the yank buffer at
+	// that moment, so Esc — or shrinking the range back — can restore them.
+	visualAnchor       int
+	visualSnapshot     map[int]bool
+	visualYankSnapshot yankBuffer
 
 	// In-flight transfer plumbing: transferEvents carries
 	// transferProgressMsg/conflictNeededMsg/transferDoneMsg back from the
