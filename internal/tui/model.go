@@ -165,15 +165,20 @@ func (y yankBuffer) without(pane int, path string) yankBuffer {
 	if y.sourcePane != pane {
 		return y
 	}
-	out := yankBuffer{sourcePane: y.sourcePane}
-	for _, f := range y.files {
-		if f != path {
-			out.files = append(out.files, f)
-		}
+	return yankBuffer{
+		sourcePane: y.sourcePane,
+		files:      removeString(y.files, path),
+		dirs:       removeString(y.dirs, path),
 	}
-	for _, d := range y.dirs {
-		if d != path {
-			out.dirs = append(out.dirs, d)
+}
+
+// removeString returns a copy of items with every element equal to s
+// dropped.
+func removeString(items []string, s string) []string {
+	var out []string
+	for _, item := range items {
+		if item != s {
+			out = append(out, item)
 		}
 	}
 	return out

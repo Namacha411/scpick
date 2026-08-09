@@ -6,6 +6,19 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// deactivateEntry unmarks entry i in pane's selected set and, unless it's
+// the ".." entry, removes its path from yank too (a no-op if it wasn't
+// there). Shared by toggleMark and applyVisualRange, the two places that
+// turn an active (marked and/or yanked) entry back off.
+func deactivateEntry(focus int, pane *paneState, selected map[int]bool, yank yankBuffer, i int) yankBuffer {
+	delete(selected, i)
+	entry := pane.entries[i]
+	if entry.IsParent {
+		return yank
+	}
+	return yank.without(focus, joinSourcePath(focus, pane.path, entry.Name))
+}
+
 // toggleMark toggles the mark on the entry under the cursor (available
 // directly from Browse mode, independent of ModeVisual). If the entry is
 // currently sitting in the yank buffer instead, Space un-yanks it there
@@ -20,8 +33,7 @@ func (m model) toggleMark() (tea.Model, tea.Cmd) {
 
 	path := joinSourcePath(m.focus, pane.path, pane.entries[i].Name)
 	if m.yank.has(m.focus, path) {
-		m.yank = m.yank.without(m.focus, path)
-		delete(pane.selected, i)
+		m.yank = deactivateEntry(m.focus, pane, pane.selected, m.yank, i)
 		m.status = fmt.Sprintf("un-yanked (%d left)", m.yank.count())
 		return m, nil
 	}
@@ -76,16 +88,14 @@ func (m *model) applyVisualRange() {
 	yank := m.visualYankSnapshot
 	for pos := lo; pos <= hi && pos < len(vis); pos++ {
 		i := vis[pos]
-		entry := pane.entries[i]
-		if entry.IsParent {
+		if pane.entries[i].IsParent {
 			continue
 		}
 		if activate {
 			selected[i] = true
 			continue
 		}
-		delete(selected, i)
-		yank = yank.without(m.focus, joinSourcePath(m.focus, pane.path, entry.Name))
+		yank = deactivateEntry(m.focus, pane, selected, yank, i)
 	}
 	pane.selected = selected
 	m.yank = yank
