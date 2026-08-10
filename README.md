@@ -23,7 +23,7 @@ command to remember.
 [Releases page](https://github.com/Namacha411/scpick/releases) (Windows and
 Linux, amd64) and put it on your `PATH`.
 
-**Or build from source** (requires Go 1.25+):
+**Or build from source** (requires Go 1.26.5+):
 
 ```sh
 git clone https://github.com/Namacha411/scpick.git
