@@ -1,5 +1,6 @@
 # scpick
 
+[![CI](https://github.com/Namacha411/scpick/actions/workflows/ci.yml/badge.svg)](https://github.com/Namacha411/scpick/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/Namacha411/scpick)](https://github.com/Namacha411/scpick/releases)
 [![Go version](https://img.shields.io/github/go-mod/go-version/Namacha411/scpick)](go.mod)
 [![License: MIT](https://img.shields.io/github/license/Namacha411/scpick)](LICENSE)
@@ -22,7 +23,7 @@ command to remember.
 [Releases page](https://github.com/Namacha411/scpick/releases) (Windows and
 Linux, amd64) and put it on your `PATH`.
 
-**Or build from source** (requires Go 1.25+):
+**Or build from source** (requires Go 1.26.5+):
 
 ```sh
 git clone https://github.com/Namacha411/scpick.git
@@ -91,6 +92,28 @@ once, for the whole paste, whether to overwrite (`o`) or skip (`s`) any
 destination files that already exist — or `Esc` to cancel — then shows a
 progress bar. One failed file doesn't abort the rest of the batch; a
 summary (succeeded/skipped/failed) is shown when it's done.
+
+## Why
+
+If you manage several SSH servers and move files around often, the usual
+tools each cost you something:
+
+- Plain `scp`/`sftp` means retyping host, user, and full paths every time,
+  with no listing of what's actually in the remote directory first.
+- On Windows, `scp`/`fzf`-based workflows mean installing and maintaining
+  WSL or Git Bash just to get a Unix-like toolchain, instead of working
+  natively in PowerShell.
+- GUI clients (WinSCP, FileZilla, ...) drop you into mouse-driven,
+  non-vim keybindings, and usually can't be scripted or driven headlessly.
+
+`scpick` is a single static binary — no `ssh`/`scp`/`fzf` dependency, no
+cgo — that gives you the same dual-pane, vim-keyed browsing experience on
+both Windows and Linux, with `~/.ssh/config` doing the host bookkeeping for
+you. (An earlier version was built on
+[`go-fuzzyfinder`](https://github.com/ktr0731/go-fuzzyfinder); it was
+replaced with a custom `bubbletea`/`lipgloss` TUI once fixed, non-remappable
+keybindings turned out to be a hard limit — see `SPEC.md` for the full
+history.)
 
 ## Development
 

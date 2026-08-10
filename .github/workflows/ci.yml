@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          out="$(gofmt -l .)"
+          if [ -n "$out" ]; then
+            echo "$out"
+            echo "::error::gofmt found unformatted files; run 'gofmt -w .'"
+            exit 1
+          fi
+      - name: go vet
+        run: |
+          go vet ./...
+          go vet -tags=integration ./...
+      - uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.12.2
+          args: --build-tags=integration
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test ./...
+      - run: go test -tags=integration ./...
+      # cgo's race runtime doesn't reliably build on Windows without
+      # MSVC/mingw (see CLAUDE.md); Linux is enough signal for -race.
+      - if: runner.os == 'Linux'
+        run: go test ./... -race
+
+  build:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [windows, linux]
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: amd64
+      CGO_ENABLED: 0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: |
+          ext=""
+          [ "${{ matrix.goos }}" = "windows" ] && ext=".exe"
+          go build -ldflags="-s -w" -trimpath -o "bin/scpick$ext" ./cmd/scpick

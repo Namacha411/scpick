@@ -5,7 +5,7 @@ pull requests are all welcome.
 
 ## Getting started
 
-Requires Go 1.25+.
+Requires Go 1.26.5+.
 
 ```sh
 go mod tidy

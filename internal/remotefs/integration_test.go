@@ -21,7 +21,7 @@ func TestIntegrationUploadListStatDownload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Dial: %v", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	localDir := t.TempDir()
 	localSrc := filepath.Join(localDir, "hello.txt")

@@ -38,10 +38,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	showVersion := fs.Bool("version", false, "print version information and exit")
 	fs.Usage = func() {
-		fmt.Fprint(stderr, usageIntro)
+		_, _ = fmt.Fprint(stderr, usageIntro)
 		fs.PrintDefaults()
-		fmt.Fprint(stderr, "\n")
-		fmt.Fprint(stderr, keyBindingReference())
+		_, _ = fmt.Fprint(stderr, "\n")
+		_, _ = fmt.Fprint(stderr, keyBindingReference())
 	}
 
 	if err := fs.Parse(args); err != nil {
@@ -55,12 +55,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if *showVersion {
-		fmt.Fprintln(stdout, versionString())
+		_, _ = fmt.Fprintln(stdout, versionString())
 		return 0
 	}
 
 	if _, err := tea.NewProgram(tui.NewModel(), tea.WithAltScreen()).Run(); err != nil {
-		fmt.Fprintf(stderr, "scpick: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "scpick: %v\n", err)
 		return 1
 	}
 	return 0
