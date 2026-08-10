@@ -28,9 +28,9 @@ jobs:
         run: |
           go vet ./...
           go vet -tags=integration ./...
-      - uses: golangci/golangci-lint-action@v6
+      - uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.12
+          version: v2.12.2
           args: --build-tags=integration
 
   test:
